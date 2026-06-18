@@ -1,0 +1,6 @@
+# These owners will be the default owners for everything in the repo.
+# TODO: assign permanent owner
+* @clara-team/engineering-platform
+
+# Github Management team will be owner for everything on .github/ folder
+.github/ @clara-team/github-management
