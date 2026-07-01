@@ -33,3 +33,6 @@ build/
 
 ### Docker env secrets ###
 docker/.env
+
+### Local planning notes ###
+plan.md
