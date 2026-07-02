@@ -13,11 +13,11 @@ This task list tracks the implementation phases for the challenge solution.
 
 ## Phase 2 - Define DDL
 
-- [ ] Extend `docker/init-scripts/db/01-init-schema.sql`.
-- [ ] Add the immutable `events` table.
-- [ ] Add the `trace_state` table.
-- [ ] Add the `trace_status_audit` table.
-- [ ] Add constraints and indexes for idempotency and lookup paths.
+- [x] Extend `docker/init-scripts/db/01-init-schema.sql`.
+- [x] Add the immutable `events` table.
+- [x] Add the `trace_state` table.
+- [x] Add the `trace_status_audit` table.
+- [x] Add constraints and indexes for idempotency and lookup paths.
 
 ## Phase 3 - Define API DTOs
 
@@ -88,8 +88,8 @@ This task list tracks the implementation phases for the challenge solution.
 - [ ] Update README with final API examples.
 - [ ] Update README with final data model.
 - [ ] Update README with final test commands.
-- [ ] Add `AI_USAGE.md`.
-- [ ] Document accepted and rejected AI suggestions.
+- [x] Add `AI_USAGE.md`.
+- [ ] Finalize accepted and rejected AI suggestions.
 
 ## Phase 11 - Verify
 
@@ -98,3 +98,4 @@ This task list tracks the implementation phases for the challenge solution.
 - [ ] Start the app with Docker/PostgreSQL.
 - [ ] Run Hurl tests.
 - [ ] Do a final README review.
+

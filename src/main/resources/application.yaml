@@ -1,4 +1,5 @@
 server:
+  port: 8081
   servlet:
     context-path: /api
 
@@ -11,9 +12,9 @@ spring:
       file: ${DOCKER_COMPOSE_FILE:docker/docker-compose.yml}
       lifecycle-management: start-only
   datasource:
-    url: jdbc:postgresql://localhost:5432/clarops_challenge
-    username: clarops
-    password: CHANGE_ME
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/clarops_challenge}
+    username: ${PG_USERNAME:clarops_user}
+    password: ${PG_PASSWORD:clarops_pass}
     driver-class-name: org.postgresql.Driver
     type: com.zaxxer.hikari.HikariDataSource
     hikari:
