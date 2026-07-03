@@ -193,6 +193,9 @@
             <includes>
               <include>**/*.md</include>
             </includes>
+            <excludes>
+              <exclude>.opencode/**/*.md</exclude>
+            </excludes>
             <flexmark></flexmark>
           </markdown>
           <sql>
