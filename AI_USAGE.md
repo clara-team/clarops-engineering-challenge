@@ -6,16 +6,20 @@ The file is updated incrementally at the end of each implementation phase so the
 
 ## Tools Used
 
-|   Tool   |                                                 Usage                                                 |
-|----------|-------------------------------------------------------------------------------------------------------|
-| OpenCode | Repository exploration, implementation assistance, documentation drafting, and verification commands. |
-| Engram   | Session memory for preserving planning decisions and implementation context across work sessions.     |
+| Tool                            | Usage                                                                                                 |
+|---------------------------------|-------------------------------------------------------------------------------------------------------|
+| OpenCode                        | Repository exploration, implementation assistance, documentation drafting, and verification commands. |
+| Engram                          | Session memory for preserving planning decisions and implementation context across work sessions.     |
+| PR description writer subagent  | Drafting, creating, and editing GitHub PR descriptions from the repository PR template.               |
+| OpenCode `/review` command      | Built-in review command for branch and diff inspection before accepting or documenting changes.       |
+| Codex cloud code reviewer       | Automated GitHub PR review comments used as an additional correctness and regression signal.          |
 
 ## Models Used
 
-|  Model  |                   Role                   |
-|---------|------------------------------------------|
-| GPT-5.5 | Main coding agent used through OpenCode. |
+| Model                  | Role                                                    |
+|------------------------|---------------------------------------------------------|
+| GPT-5.5                | Main coding agent used through OpenCode.                |
+| GPT-5.4 Mini Fast      | PR description writer subagent used for GitHub PR body. |
 
 ## Phase 1 - Assumptions and Documentation
 
@@ -108,4 +112,3 @@ Additional requests:
 ### Manual Corrections
 
 - The local Java runtime was corrected to Java 21 with asdf before using `./mvnw spotless:check` as a validation signal.
-
