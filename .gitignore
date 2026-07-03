@@ -31,6 +31,9 @@ build/
 ### VS Code ###
 .vscode/
 
+### OpenCode local config ###
+.opencode/
+
 ### Docker env secrets ###
 docker/.env
 
