@@ -6,11 +6,21 @@ The service receives distributed events, tracks the state of a flow by `traceId`
 
 The original challenge statement is preserved in [CHALLENGE_INSTRUCTIONS.md](CHALLENGE_INSTRUCTIONS.md).
 
-## Current Phase
+## Current Status
 
-Phase 2: database DDL.
+The project is being implemented in phases. This README is maintained as the final solution document and grows as each phase is completed. Completed phase notes remain in place so the reasoning and implementation history are not lost when later phases add more behavior.
 
-This README captures the product and technical assumptions that guide the implementation, plus the current database design decisions.
+Implemented so far:
+
+- Phase 1: assumptions, MVP scope, technical decisions, and implementation plan.
+- Phase 2: PostgreSQL DDL for event history, current trace state, and status audit trail.
+
+Not implemented yet:
+
+- Public event/status DTOs and endpoints.
+- Domain transition logic and persistence services.
+- Lazy expiration behavior in application code.
+- Unit tests, Hurl end-to-end tests, and final verification.
 
 ## Scope
 
@@ -62,6 +72,32 @@ The solution will stay intentionally small, but it will include enough productio
 | Validation        | Bean Validation annotations on request DTOs                                    |
 | Testing focus     | Unit tests for business rules and Hurl tests for public HTTP behavior          |
 
+## Implementation Progress
+
+### Phase 1: Assumptions and Planning
+
+Phase 1 established the product scope, business assumptions, implementation trade-offs, and the task breakdown for the rest of the challenge.
+
+Delivered in this phase:
+
+- Preserved the original challenge statement in [CHALLENGE_INSTRUCTIONS.md](CHALLENGE_INSTRUCTIONS.md).
+- Defined the MVP endpoints and expected behavior.
+- Documented assumptions around TTL calculation, lazy expiration, idempotency, conflicts, terminal statuses, and unknown traces.
+- Chose the initial stack and architecture direction: Spring Boot 4, Java 21, Maven, PostgreSQL, JPA repositories, and REST JSON APIs.
+- Created the implementation checklist in [TASKS.md](TASKS.md).
+
+### Phase 2: Database DDL
+
+Phase 2 added the database structure required by the planned event ingestion and trace status workflows. The DDL is intentionally ahead of the application code so later phases can map persistence and business behavior to an explicit schema.
+
+Delivered in this phase:
+
+- Added an immutable `events` table for accepted distributed events.
+- Added a `trace_state` table for efficient current-status lookup by `traceId`.
+- Added a `trace_status_audit` table for state transition history.
+- Added constraints for valid statuses, event results, final-event rules, waiting-trace requirements, terminal timestamps, and idempotent event IDs.
+- Added indexes for trace event lookup, status lookup, pending expiration lookup, and audit lookup.
+
 ## Data Model
 
 The PostgreSQL DDL is defined in `docker/init-scripts/db/01-init-schema.sql`. The schema uses one
@@ -108,4 +144,3 @@ At the beginning of Phase 1, the repository still contains only the baseline hea
 ```http
 GET /api/health
 ```
-
