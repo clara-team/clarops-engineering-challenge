@@ -10,9 +10,23 @@
 
 ## Java Version
 
-The repository includes a `.sdkmanrc` file. If you use [SDKMAN](https://sdkman.io/), run the
-following command inside the project root to activate Java 21 automatically in your terminal
-session:
+The project targets Java 21. The repository includes version-manager files for both
+[asdf](https://asdf-vm.com/) and [SDKMAN](https://sdkman.io/):
+
+- `.tool-versions` pins `java corretto-21.0.7.6.1` for asdf users.
+- `.sdkmanrc` pins a Java 21 distribution for SDKMAN users.
+
+If you use asdf, make sure the Java plugin is installed and run the following commands from the
+project root:
+
+```bash
+asdf install
+asdf current java
+java --version
+```
+
+If you use SDKMAN, run the following command inside the project root to activate Java 21
+automatically in your terminal session:
 
 ```bash
 sdk env
@@ -31,13 +45,13 @@ cp docker/example.env docker/.env
 
 Then edit `docker/.env` and replace the placeholder values:
 
-| Variable          | Description                        | Default              |
-|-------------------|------------------------------------|----------------------|
-| `PG_HOST_PORT`    | Host port mapped to PostgreSQL     | `5432`               |
-| `PG_USERNAME`     | PostgreSQL user                    | `clarops`            |
-| `PG_PASSWORD`     | PostgreSQL user password           | `CHANGE_ME`          |
-| `PG_DATABASE`     | Database name                      | `clarops_challenge`  |
-| `PG_ADMIN_PASSWORD` | Password for the `postgres` admin user | `CHANGE_ME_ADMIN` |
+|      Variable       |              Description               |       Default       |
+|---------------------|----------------------------------------|---------------------|
+| `PG_HOST_PORT`      | Host port mapped to PostgreSQL         | `5432`              |
+| `PG_USERNAME`       | PostgreSQL user                        | `clarops`           |
+| `PG_PASSWORD`       | PostgreSQL user password               | `CHANGE_ME`         |
+| `PG_DATABASE`       | Database name                          | `clarops_challenge` |
+| `PG_ADMIN_PASSWORD` | Password for the `postgres` admin user | `CHANGE_ME_ADMIN`   |
 
 > **Important:** the values for `PG_HOST_PORT`, `PG_USERNAME`, `PG_PASSWORD`, and `PG_DATABASE`
 > must match the `spring.datasource` settings in `src/main/resources/application.yaml`.
@@ -52,6 +66,9 @@ The project includes the `spring-boot-docker-compose` dependency. When the appli
 Spring Boot will automatically bring up the Docker stack located at `docker/docker-compose.yml`
 — no manual `docker-compose up` is needed.
 
+By default, the application runs on `http://localhost:8081` and PostgreSQL is exposed on
+`localhost:5432`.
+
 ```bash
 ./mvnw spring-boot:run
 ```
@@ -62,18 +79,18 @@ Spring Boot will automatically bring up the Docker stack located at `docker/dock
 
 The database initialisation script (`docker/init-scripts/db/01-init-schema.sql`) creates the
 `clarops_challenge_schema` schema and a `health` table seeded with the value
-`clarops sr engineer challenge`.
+`clarops event watchdog`.
 
 Once the application is running, call the health endpoint to confirm everything is working:
 
 ```bash
-curl http://localhost:8080/api/health
+curl http://localhost:8081/api/health
 ```
 
 Expected response:
 
 ```
-clarops sr engineer challenge
+clarops event watchdog
 ```
 
 ---
@@ -132,4 +149,3 @@ export DOCKER_COMPOSE_FILE=/absolute/path/to/docker/docker-compose.yml
 
 > You can add your tables to the existing `clarops_challenge_schema` schema or define a new one —
 > both approaches work.
-

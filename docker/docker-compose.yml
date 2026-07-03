@@ -8,7 +8,7 @@ services:
     networks:
       - "${DOCKER_NETWORK_NAME:-clarops_challenge_network}"
     volumes:
-      - postgresql_data:/bitnami/postgresql
+      - event_watchdog_postgresql_data:/bitnami/postgresql
       - ./init-scripts/db:/docker-entrypoint-initdb.d
     environment:
       - POSTGRESQL_USERNAME=${PG_USERNAME:-clarops}
@@ -23,7 +23,7 @@ services:
       start_period: 10s
 
 volumes:
-  postgresql_data:
+  event_watchdog_postgresql_data:
     driver: local
 
 networks:
