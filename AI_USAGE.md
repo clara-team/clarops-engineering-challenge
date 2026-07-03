@@ -13,6 +13,7 @@ The file is updated incrementally at the end of each implementation phase so the
 | PR description writer subagent  | Drafting, creating, and editing GitHub PR descriptions from the repository PR template.               |
 | OpenCode `/review` command      | Built-in review command for branch and diff inspection before accepting or documenting changes.       |
 | Codex cloud code reviewer       | Automated GitHub PR review comments used as an additional correctness and regression signal.          |
+| ChatGPT                         | Prompt refinement and optimization before using AI-assisted implementation or documentation workflows. |
 
 ## Models Used
 
