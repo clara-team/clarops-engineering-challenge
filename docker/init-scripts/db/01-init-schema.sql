@@ -108,7 +108,7 @@ CREATE
       last_event_occurred_at TIMESTAMPTZ NOT NULL,
       next_expected_event VARCHAR(120),
       next_expected_before TIMESTAMPTZ,
-      events_received INTEGER NOT NULL DEFAULT 0,
+      events_received INTEGER NOT NULL DEFAULT 1,
       completed_at TIMESTAMPTZ,
       expired_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

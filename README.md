@@ -67,11 +67,11 @@ The solution will stay intentionally small, but it will include enough productio
 The PostgreSQL DDL is defined in `docker/init-scripts/db/01-init-schema.sql`. The schema uses one
 immutable history table, one current-state table, and one append-only audit table.
 
-|        Table         |                                            Purpose                                            |                                                                        Key columns                                                                         |
-|----------------------|-----------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `events`             | Stores accepted distributed events as immutable history.                                      | `id`, `event_id`, `trace_id`, `event_name`, `result`, `occurred_at`, `received_at`, `next_expected_event`, `next_event_ttl_seconds`, `metadata`            |
-| `trace_state`        | Stores the current status of each trace for efficient `GET /traces/{traceId}/status` lookups. | `trace_id`, `status`, `last_event_id`, `last_event_name`, `last_event_result`, `next_expected_event`, `next_expected_before`, `completed_at`, `expired_at` |
-| `trace_status_audit` | Records state transitions and supports future alerting or debugging use cases.                | `id`, `trace_id`, `previous_status`, `new_status`, `reason`, `event_id`, `created_at`                                                                      |
+|        Table         |                                            Purpose                                            |                                                                                  Key columns                                                                                  |
+|----------------------|-----------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `events`             | Stores accepted distributed events as immutable history.                                      | `id`, `event_id`, `trace_id`, `event_name`, `result`, `occurred_at`, `received_at`, `next_expected_event`, `next_event_ttl_seconds`, `metadata`                               |
+| `trace_state`        | Stores the current status of each trace for efficient `GET /traces/{traceId}/status` lookups. | `trace_id`, `status`, `last_event_id`, `last_event_name`, `last_event_result`, `next_expected_event`, `next_expected_before`, `events_received`, `completed_at`, `expired_at` |
+| `trace_status_audit` | Records state transitions and supports future alerting or debugging use cases.                | `id`, `trace_id`, `previous_status`, `new_status`, `reason`, `event_id`, `created_at`                                                                                         |
 
 Important constraints and indexes:
 
@@ -80,6 +80,7 @@ Important constraints and indexes:
 - `events.next_expected_event` and `events.next_event_ttl_seconds` must be provided together.
 - `events.final_event` cannot be combined with `next_expected_event` or `next_event_ttl_seconds`.
 - `trace_state.status` is restricted to `STARTED`, `WAITING_OTHER_EVENT`, `TTL_EXPIRED_FOR_EVENT`, or `COMPLETED`.
+- `trace_state.events_received` defaults to `1` and must stay greater than `0` because a trace state exists only after the first accepted event.
 - `trace_state` requires waiting traces to have both `next_expected_event` and `next_expected_before`.
 - `trace_state` requires terminal timestamps for completed and expired traces.
 - Indexes support event lookup by trace, status lookup, pending-expiration lookup, and audit lookup by trace or creation time.
