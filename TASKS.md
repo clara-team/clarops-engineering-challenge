@@ -21,11 +21,11 @@ This task list tracks the implementation phases for the challenge solution.
 
 ## Phase 3 - Define API DTOs
 
-- [ ] Add `EventRequest`.
-- [ ] Add `TraceStatusResponse`.
-- [ ] Add `ErrorResponse`.
-- [ ] Add validation annotations.
-- [ ] Define enum values used by the API.
+- [x] Add `EventRequest`.
+- [x] Add `TraceStatusResponse`.
+- [x] Add `ErrorResponse`.
+- [x] Add validation annotations.
+- [x] Define enum values used by the API.
 
 ## Phase 4 - Implement Domain Logic
 

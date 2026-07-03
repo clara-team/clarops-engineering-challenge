@@ -14,10 +14,11 @@ Implemented so far:
 
 - Phase 1: assumptions, MVP scope, technical decisions, and implementation plan.
 - Phase 2: PostgreSQL DDL for event history, current trace state, and status audit trail.
+- Phase 3: public API DTOs, validation annotations, and API enum values.
 
 Not implemented yet:
 
-- Public event/status DTOs and endpoints.
+- Public event/status endpoints.
 - Domain transition logic and persistence services.
 - Lazy expiration behavior in application code.
 - Unit tests, Hurl end-to-end tests, and final verification.
@@ -98,6 +99,87 @@ Delivered in this phase:
 - Added constraints for valid statuses, event results, final-event rules, waiting-trace requirements, terminal timestamps, and idempotent event IDs.
 - Added indexes for trace event lookup, status lookup, pending expiration lookup, and audit lookup.
 
+### Phase 3: API DTOs
+
+Phase 3 defined the public JSON contract that later endpoint and service phases will use. The DTOs live under `com.clara.challenge.event.api` and intentionally do not contain persistence or transition logic.
+
+Delivered in this phase:
+
+- Added `EventRequest` for `POST /events` request payloads.
+- Added `TraceStatusResponse` for `GET /traces/{traceId}/status` responses.
+- Added `ErrorResponse` for standard JSON error responses.
+- Added API enums for event results, trace statuses, and error codes.
+- Added Bean Validation rules for required fields, max string sizes, positive TTL values, paired `nextExpectedEvent`/`nextEventTtlSeconds`, and invalid `finalEvent` combinations.
+
+## API Contract
+
+### Event Request
+
+`POST /events` will accept this request body:
+
+```json
+{
+  "eventId": "evt-001",
+  "traceId": "trace-123",
+  "eventName": "APPLICATION_RECEIVED",
+  "result": "SUCCESS",
+  "occurredAt": "2026-06-15T10:00:00Z",
+  "nextExpectedEvent": "RULES_EVALUATED",
+  "nextEventTtlSeconds": 120,
+  "finalEvent": false,
+  "metadata": {
+    "country": "MX",
+    "entityId": "company-123"
+  }
+}
+```
+
+Validation rules:
+
+- `eventId`, `traceId`, `eventName`, `result`, and `occurredAt` are required.
+- `eventId`, `traceId`, `eventName`, and `nextExpectedEvent` are limited to 120 characters to match the DDL.
+- `result` must be `SUCCESS` or `ERROR`.
+- `nextExpectedEvent` must not be blank when present.
+- `nextEventTtlSeconds` must be positive when present.
+- `nextExpectedEvent` and `nextEventTtlSeconds` must be provided together.
+- `finalEvent` defaults to `false` and cannot be combined with `nextExpectedEvent` or `nextEventTtlSeconds`.
+
+### Trace Status Response
+
+`GET /traces/{traceId}/status` will return the current trace status in this shape:
+
+```json
+{
+  "traceId": "trace-123",
+  "status": "WAITING_OTHER_EVENT",
+  "lastEventName": "APPLICATION_RECEIVED",
+  "lastEventResult": "SUCCESS",
+  "nextExpectedEvent": "RULES_EVALUATED",
+  "nextExpectedBefore": "2026-06-15T10:02:00Z",
+  "eventsReceived": 1
+}
+```
+
+Supported trace statuses are `STARTED`, `WAITING_OTHER_EVENT`, `TTL_EXPIRED_FOR_EVENT`, and `COMPLETED`.
+
+### Error Response
+
+Error responses will use a standard JSON shape:
+
+```json
+{
+  "code": "VALIDATION_ERROR",
+  "message": "Request validation failed",
+  "traceId": "trace-123",
+  "details": {
+    "eventId": "must not be blank"
+  },
+  "timestamp": "2026-06-15T10:00:00Z"
+}
+```
+
+Supported error codes are `VALIDATION_ERROR`, `TRACE_NOT_FOUND`, `EVENT_CONFLICT`, and `INTERNAL_ERROR`.
+
 ## Data Model
 
 The PostgreSQL DDL is defined in `docker/init-scripts/db/01-init-schema.sql`. The schema uses one
@@ -144,3 +226,4 @@ At the beginning of Phase 1, the repository still contains only the baseline hea
 ```http
 GET /api/health
 ```
+

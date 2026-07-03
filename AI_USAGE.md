@@ -6,21 +6,21 @@ The file is updated incrementally at the end of each implementation phase so the
 
 ## Tools Used
 
-| Tool                            | Usage                                                                                                 |
-|---------------------------------|-------------------------------------------------------------------------------------------------------|
-| OpenCode                        | Repository exploration, implementation assistance, documentation drafting, and verification commands. |
-| Engram                          | Session memory for preserving planning decisions and implementation context across work sessions.     |
-| PR description writer subagent  | Drafting, creating, and editing GitHub PR descriptions from the repository PR template.               |
-| OpenCode `/review` command      | Built-in review command for branch and diff inspection before accepting or documenting changes.       |
-| Codex cloud code reviewer       | Automated GitHub PR review comments used as an additional correctness and regression signal.          |
-| ChatGPT                         | Prompt refinement and optimization before using AI-assisted implementation or documentation workflows. |
+|              Tool              |                                                 Usage                                                  |
+|--------------------------------|--------------------------------------------------------------------------------------------------------|
+| OpenCode                       | Repository exploration, implementation assistance, documentation drafting, and verification commands.  |
+| Engram                         | Session memory for preserving planning decisions and implementation context across work sessions.      |
+| PR description writer subagent | Drafting, creating, and editing GitHub PR descriptions from the repository PR template.                |
+| OpenCode `/review` command     | Built-in review command for branch and diff inspection before accepting or documenting changes.        |
+| Codex cloud code reviewer      | Automated GitHub PR review comments used as an additional correctness and regression signal.           |
+| ChatGPT                        | Prompt refinement and optimization before using AI-assisted implementation or documentation workflows. |
 
 ## Models Used
 
-| Model                  | Role                                                    |
-|------------------------|---------------------------------------------------------|
-| GPT-5.5                | Main coding agent used through OpenCode.                |
-| GPT-5.4 Mini Fast      | PR description writer subagent used for GitHub PR body. |
+|       Model       |                          Role                           |
+|-------------------|---------------------------------------------------------|
+| GPT-5.5           | Main coding agent used through OpenCode.                |
+| GPT-5.4 Mini Fast | PR description writer subagent used for GitHub PR body. |
 
 ## Phase 1 - Assumptions and Documentation
 
@@ -113,3 +113,93 @@ Additional requests:
 ### Manual Corrections
 
 - The local Java runtime was corrected to Java 21 with asdf before using `./mvnw spotless:check` as a validation signal.
+
+## Phase 3 - API DTOs
+
+### Prompts and Requests
+
+Main DTO prompt:
+
+> Start Phase 3 from the updated `develop` branch and implement the API DTO contract for the Event Watchdog MVP.
+>
+> Before writing code:
+>
+> - verify the working tree is clean;
+> - run a fresh `git pull --ff-only` on `develop`;
+> - create a new branch named `phase-3-api-dtos`;
+> - review `CHALLENGE_INSTRUCTIONS.md`, `TASKS.md`, and the existing `README.md` so the DTOs match the challenge contract and previously documented assumptions.
+>
+> Keep the phase strictly scoped to DTOs and API contract types. Do not add controllers, services, repositories, entities, persistence mapping, state transition logic, or Hurl tests in this phase.
+>
+> Add public API contract types under `src/main/java/com/clara/challenge/event/api`:
+>
+> - `EventRequest` for `POST /events`;
+> - `TraceStatusResponse` for `GET /traces/{traceId}/status`;
+> - `ErrorResponse` for standard JSON errors;
+> - enum values used by the API.
+>
+> `EventRequest` must support the request fields from the challenge instructions:
+>
+> - `eventId`;
+> - `traceId`;
+> - `eventName`;
+> - `result`;
+> - `occurredAt`;
+> - `nextExpectedEvent`;
+> - `nextEventTtlSeconds`;
+> - `finalEvent`;
+> - `metadata`.
+>
+> Use Java records for DTOs and Bean Validation annotations for the request contract:
+>
+> - required fields must be non-null/non-blank as appropriate;
+> - string fields that map to the DDL should be limited to 120 characters;
+> - `result` must use an enum with allowed values `SUCCESS` and `ERROR`;
+> - `occurredAt` must be required and represented as an instant/date-time type suitable for ISO-8601 timestamps;
+> - `nextEventTtlSeconds` must be positive when present;
+> - `nextExpectedEvent` and `nextEventTtlSeconds` must be provided together;
+> - `nextExpectedEvent` must not be blank when present;
+> - `finalEvent` defaults to `false` when omitted;
+> - `finalEvent = true` cannot be combined with `nextExpectedEvent` or `nextEventTtlSeconds`.
+>
+> `TraceStatusResponse` should include enough fields to explain the current trace state, aligned with the README and challenge example:
+>
+> - `traceId`;
+> - `status`;
+> - `lastEventName`;
+> - `lastEventResult`;
+> - `nextExpectedEvent`;
+> - `nextExpectedBefore`;
+> - `eventsReceived`.
+>
+> Define trace status enum values exactly as documented: `STARTED`, `WAITING_OTHER_EVENT`, `TTL_EXPIRED_FOR_EVENT`, and `COMPLETED`.
+>
+> Define `ErrorResponse` with a stable structure that later exception handling can reuse, including an error code, message, optional `traceId`, details, and timestamp. Include error code enum values for validation errors, missing traces, event conflicts, and unexpected internal errors.
+>
+> Update documentation cumulatively:
+>
+> - mark Phase 3 complete in `TASKS.md`;
+> - add Phase 3 progress to `README.md` without replacing Phase 1 or Phase 2 notes;
+> - document the request, status response, error response, enum values, and validation rules in `README.md`;
+> - update `AI_USAGE.md` with this Phase 3 prompt, accepted suggestions, rejected suggestions, and manual corrections.
+>
+> Run formatting and verification after the changes. Prefer `./mvnw spotless:apply test` or `./mvnw clean test` depending on what is needed. Report any warnings separately from failures.
+
+Additional requests:
+
+- "Explain Phase 3 from the updated `develop` branch before implementing it."
+
+### Accepted Suggestions
+
+- Keep Phase 3 scoped to API contracts only: DTOs, validation annotations, and enum values.
+- Use Java records for request/response DTOs to keep the contract immutable and concise.
+- Put public event API contracts under `com.clara.challenge.event.api` so later phases can add domain, persistence, and controller packages without mixing responsibilities.
+- Use Bean Validation on `EventRequest` for required fields, size limits, positive TTL, paired next-event fields, and invalid final-event combinations.
+
+### Rejected or Adjusted Suggestions
+
+- No controllers, services, entities, repositories, or state transition logic were added in Phase 3 because those are assigned to later phases.
+
+### Manual Corrections
+
+- The README was updated cumulatively by adding Phase 3 progress and API contract sections instead of replacing earlier phase notes.
