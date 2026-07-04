@@ -35,44 +35,47 @@ This task list tracks the implementation phases for the challenge solution.
 - [x] Add explicit duplicate payload comparison.
 - [x] Keep business rules outside controllers.
 
-## Phase 5 - Implement Persistence
-
-- [ ] Add event entity and repository.
-- [ ] Add trace state entity and repository.
-- [ ] Add trace status audit entity and repository.
-- [ ] Implement transactional event ingestion.
-- [ ] Keep event history and current state consistent.
-
-## Phase 6 - Implement Endpoints
-
-- [ ] Add `POST /events`.
-- [ ] Add `GET /traces/{traceId}/status`.
-- [ ] Add global exception handling.
-- [ ] Return standard error responses.
-- [ ] Return correct HTTP status codes.
-
-## Phase 7 - Implement Lazy Expiration
-
-- [ ] Detect expired waiting traces on status reads.
-- [ ] Persist `TTL_EXPIRED_FOR_EVENT`.
-- [ ] Populate `expired_at`.
-- [ ] Write `TTL_EXPIRED` audit rows.
-- [ ] Keep repeated status reads idempotent.
-
-## Phase 8 - Add Unit Tests
+## Phase 5 - Add Domain Unit Tests
 
 - [ ] Test first event creates `STARTED`.
 - [ ] Test first event with next expected event creates `WAITING_OTHER_EVENT`.
 - [ ] Test final event creates `COMPLETED`.
 - [ ] Test TTL expiration creates `TTL_EXPIRED_FOR_EVENT`.
+- [ ] Test premature TTL expiration is rejected.
 - [ ] Test expected event before TTL advances state.
 - [ ] Test expected event after TTL is rejected.
 - [ ] Test unexpected event is rejected.
 - [ ] Test equivalent duplicate event is idempotent.
 - [ ] Test different duplicate event returns conflict.
 - [ ] Test completed trace rejects new events.
+- [ ] Test expired trace rejects new events.
+- [ ] Test metadata with JSON null values is preserved.
+- [ ] Test transition reasons match the audit schema vocabulary.
 
-## Phase 9 - Add Hurl E2E Tests
+## Phase 6 - Implement Persistence and Transactional Service
+
+- [ ] Add event entity and repository.
+- [ ] Add trace state entity and repository.
+- [ ] Add trace status audit entity and repository.
+- [ ] Map persistence rows to domain records.
+- [ ] Implement transactional event ingestion.
+- [ ] Use domain transition rules and duplicate comparison.
+- [ ] Keep event history, current state, and audit rows consistent.
+
+## Phase 7 - Implement Endpoints and Lazy Expiration
+
+- [ ] Add `POST /events`.
+- [ ] Add `GET /traces/{traceId}/status`.
+- [ ] Add global exception handling.
+- [ ] Return standard error responses.
+- [ ] Return correct HTTP status codes.
+- [ ] Detect expired waiting traces on status reads.
+- [ ] Persist `TTL_EXPIRED_FOR_EVENT`.
+- [ ] Populate `expired_at`.
+- [ ] Write `TTL_EXPIRED` audit rows.
+- [ ] Keep repeated status reads idempotent.
+
+## Phase 8 - Add Hurl E2E Tests, Final Docs, and Verification
 
 - [ ] Add started flow scenario.
 - [ ] Add waiting-other-event flow scenario.
@@ -82,17 +85,11 @@ This task list tracks the implementation phases for the challenge solution.
 - [ ] Add duplicate-idempotent flow scenario.
 - [ ] Add late-event conflict scenario.
 - [ ] Add unknown-trace scenario.
-
-## Phase 10 - Document Final Solution
-
 - [ ] Update README with final API examples.
 - [ ] Update README with final data model.
 - [ ] Update README with final test commands.
 - [x] Add `AI_USAGE.md`.
 - [ ] Finalize accepted and rejected AI suggestions.
-
-## Phase 11 - Verify
-
 - [ ] Run Maven verification.
 - [ ] Run formatting checks.
 - [ ] Start the app with Docker/PostgreSQL.

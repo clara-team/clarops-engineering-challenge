@@ -237,13 +237,10 @@ Important constraints and indexes:
 2. Define PostgreSQL DDL for event history, trace state, and audit trail.
 3. Define API request, response, and error DTOs.
 4. Implement state transition logic outside controllers.
-5. Implement persistence entities, repositories, and transactional service flow.
-6. Expose `POST /events` and `GET /traces/{traceId}/status`.
-7. Implement lazy TTL expiration on status reads.
-8. Add unit tests for core business rules.
-9. Add Hurl end-to-end tests for public API scenarios.
-10. Complete final documentation and AI usage notes.
-11. Run final verification.
+5. Add unit tests for domain transition rules before adding infrastructure.
+6. Implement persistence entities, repositories, and transactional service flow.
+7. Expose `POST /events` and `GET /traces/{traceId}/status`, including lazy TTL expiration.
+8. Add Hurl end-to-end tests, complete final documentation, and run final verification.
 
 ## Running the Project
 
