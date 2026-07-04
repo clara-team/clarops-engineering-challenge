@@ -121,6 +121,7 @@ Delivered in this phase:
 - Added domain event result and trace status enums with the same vocabulary documented by the challenge.
 - Added immutable domain records for incoming events, current trace state, and transition results.
 - Added `EventTransitionService` for first-event and next-event state transitions.
+- Added transition reasons aligned with the `trace_status_audit.reason` database constraint.
 - Added domain exceptions for event conflicts and missing traces.
 - Added `DuplicateEventComparator` for explicit duplicate `eventId` payload comparison.
 - Kept business rules outside controllers, repositories, and entities.
@@ -133,6 +134,7 @@ Domain transition behavior:
 - A waiting trace only accepts the exact expected event name.
 - Expected events are accepted when `occurredAt` is on or before `nextExpectedBefore`; events after that deadline are rejected as conflicts.
 - Waiting traces can only be expired after `nextExpectedBefore`; attempts to expire at or before the deadline are rejected.
+- Transition reasons use the persisted audit vocabulary: `TRACE_CREATED`, `NEXT_EVENT_EXPECTED`, `EXPECTED_EVENT_RECEIVED`, `FINAL_EVENT_RECEIVED`, `TTL_EXPIRED`, and `DUPLICATE_EVENT_IDEMPOTENT`.
 - Completed and expired traces reject new events.
 - `SUCCESS` and `ERROR` are stored as event results; they do not directly determine trace status.
 - Equivalent duplicate events are identified by comparing all relevant event fields, including metadata. Metadata is copied defensively while preserving JSON `null` values.

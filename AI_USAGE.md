@@ -271,4 +271,5 @@ Main domain prompt:
 - The README was updated as an additive final-solution document by appending Phase 4 progress and behavior notes.
 - A review found that `expireWaitingTrace` could expire a waiting trace before the TTL deadline; the domain service now rejects expiration at or before `nextExpectedBefore`.
 - A review found that `Map.copyOf` rejected metadata entries with JSON `null` values; metadata is now defensively copied with an unmodifiable map that preserves null values.
+- A PR review found that transition reasons did not match the audit schema constraint; `TransitionReason` now uses the persisted audit vocabulary directly.
 

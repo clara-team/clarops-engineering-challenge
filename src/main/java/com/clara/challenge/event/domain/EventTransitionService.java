@@ -8,7 +8,7 @@ public class EventTransitionService {
   public TransitionResult applyFirstEvent(IncomingEvent event) {
     Objects.requireNonNull(event, "event is required");
 
-    return transitionFromAcceptedEvent(event, 1, initialReason(event));
+    return transitionFromAcceptedEvent(event, 1, reasonForAcceptedEvent(event, true));
   }
 
   public TransitionResult applyNextEvent(TraceState currentState, IncomingEvent event) {
@@ -33,10 +33,10 @@ public class EventTransitionService {
     }
 
     return transitionFromAcceptedEvent(
-        event, currentState.eventsReceived() + 1, TransitionReason.EXPECTED_EVENT_RECEIVED);
+        event, currentState.eventsReceived() + 1, reasonForAcceptedEvent(event, false));
   }
 
-  public TraceState expireWaitingTrace(TraceState currentState, Instant expiredAt) {
+  public TransitionResult expireWaitingTrace(TraceState currentState, Instant expiredAt) {
     Objects.requireNonNull(currentState, "currentState is required");
     Objects.requireNonNull(expiredAt, "expiredAt is required");
 
@@ -48,18 +48,21 @@ public class EventTransitionService {
       throw new EventConflictException("Waiting trace cannot expire before the TTL deadline");
     }
 
-    return new TraceState(
-        currentState.traceId(),
-        TraceStatus.TTL_EXPIRED_FOR_EVENT,
-        currentState.lastEventId(),
-        currentState.lastEventName(),
-        currentState.lastEventResult(),
-        currentState.lastEventOccurredAt(),
-        currentState.nextExpectedEvent(),
-        currentState.nextExpectedBefore(),
-        currentState.eventsReceived(),
-        null,
-        expiredAt);
+    TraceState expiredState =
+        new TraceState(
+            currentState.traceId(),
+            TraceStatus.TTL_EXPIRED_FOR_EVENT,
+            currentState.lastEventId(),
+            currentState.lastEventName(),
+            currentState.lastEventResult(),
+            currentState.lastEventOccurredAt(),
+            currentState.nextExpectedEvent(),
+            currentState.nextExpectedBefore(),
+            currentState.eventsReceived(),
+            null,
+            expiredAt);
+
+    return new TransitionResult(expiredState, TransitionReason.TTL_EXPIRED);
   }
 
   private void requireExpectedEvent(TraceState currentState, IncomingEvent event) {
@@ -109,15 +112,19 @@ public class EventTransitionService {
     return TraceStatus.STARTED;
   }
 
-  private TransitionReason initialReason(IncomingEvent event) {
+  private TransitionReason reasonForAcceptedEvent(IncomingEvent event, boolean firstEvent) {
     if (event.finalEvent()) {
-      return TransitionReason.TRACE_COMPLETED;
+      return TransitionReason.FINAL_EVENT_RECEIVED;
     }
 
     if (event.definesNextExpectedEvent()) {
-      return TransitionReason.WAITING_FOR_NEXT_EVENT;
+      return TransitionReason.NEXT_EVENT_EXPECTED;
     }
 
-    return TransitionReason.TRACE_STARTED;
+    if (firstEvent) {
+      return TransitionReason.TRACE_CREATED;
+    }
+
+    return TransitionReason.EXPECTED_EVENT_RECEIVED;
   }
 }
