@@ -274,3 +274,31 @@ Main domain prompt:
 - A PR review found that transition reasons did not match the audit schema constraint; `TransitionReason` now uses the persisted audit vocabulary directly.
 - The remaining roadmap was reduced to 8 phases and domain unit tests were moved before persistence so the core rules are verified before adding database and HTTP layers.
 
+## Phase 5 - Domain Unit Tests
+
+### Prompt Used
+
+```text
+Add Phase 5 domain unit tests for the Event Watchdog service.
+
+Use the following testing standard:
+- Use JUnit 5 with AssertJ assertions.
+- Test method names must follow shouldExpectedBehavior_WhenCondition.
+- Use Arrange / Act / Assert structure.
+- Each test should validate one business rule or invariant.
+- Avoid Spring context because the tested classes are pure domain code.
+- Use fixed Instants for time-dependent rules.
+- Do not add tests for behavior outside the challenge requirements unless clearly tied to a documented assumption.
+
+Cover EventTransitionService business rules, DuplicateEventComparator duplicate classification, metadata preservation with JSON null values, and TransitionReason values matching the audit schema vocabulary. Keep the tests focused, readable, and aligned with the existing domain API.
+```
+
+### Accepted Suggestions
+
+- Added focused unit tests for `EventTransitionService` state transitions, terminal-state rejections, TTL expiration boundaries, metadata copying, and audit-compatible transition reasons.
+- Added focused unit tests for `DuplicateEventComparator` covering equivalent duplicates, conflicting duplicates, and different event IDs.
+
+### Rejected or Adjusted Suggestions
+
+- No Spring context was used for Phase 5 tests because the tested logic is pure domain code.
+
