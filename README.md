@@ -16,13 +16,14 @@ Implemented so far:
 - Phase 2: PostgreSQL DDL for event history, current trace state, and status audit trail.
 - Phase 3: public API DTOs, validation annotations, and API enum values.
 - Phase 4: domain transition rules, conflict exceptions, and duplicate event comparison.
+- Phase 5: unit tests for the pure domain transition and duplicate-comparison rules.
 
 Not implemented yet:
 
 - Public event/status endpoints.
 - Persistence services.
 - Lazy expiration behavior in application code.
-- Unit tests, Hurl end-to-end tests, and final verification.
+- Hurl end-to-end tests and final verification.
 
 ## Scope
 
@@ -138,6 +139,18 @@ Domain transition behavior:
 - Completed and expired traces reject new events.
 - `SUCCESS` and `ERROR` are stored as event results; they do not directly determine trace status.
 - Equivalent duplicate events are identified by comparing all relevant event fields, including metadata. Metadata is copied defensively while preserving JSON `null` values.
+
+### Phase 5: Domain Unit Tests
+
+Phase 5 added JUnit 5 tests for the framework-free domain layer before introducing persistence or HTTP endpoint behavior. The tests intentionally avoid a Spring context and use fixed timestamps so the core business rules can be verified without database or web concerns.
+
+Delivered in this phase:
+
+- Added `EventTransitionServiceTest` for first-event transitions, waiting traces, final events, TTL expiration, premature expiration rejection, expected/late/unexpected events, and terminal trace rejection.
+- Added assertions that emitted transition reasons and the full `TransitionReason` enum match the audit schema vocabulary.
+- Added coverage for preserving metadata entries with JSON `null` values while keeping metadata immutable.
+- Added `DuplicateEventComparatorTest` for equivalent duplicates, conflicting duplicates, and different event IDs.
+- Marked the Phase 5 checklist complete in [TASKS.md](TASKS.md).
 
 ## API Contract
 

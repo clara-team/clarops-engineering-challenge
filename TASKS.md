@@ -37,20 +37,20 @@ This task list tracks the implementation phases for the challenge solution.
 
 ## Phase 5 - Add Domain Unit Tests
 
-- [ ] Test first event creates `STARTED`.
-- [ ] Test first event with next expected event creates `WAITING_OTHER_EVENT`.
-- [ ] Test final event creates `COMPLETED`.
-- [ ] Test TTL expiration creates `TTL_EXPIRED_FOR_EVENT`.
-- [ ] Test premature TTL expiration is rejected.
-- [ ] Test expected event before TTL advances state.
-- [ ] Test expected event after TTL is rejected.
-- [ ] Test unexpected event is rejected.
-- [ ] Test equivalent duplicate event is idempotent.
-- [ ] Test different duplicate event returns conflict.
-- [ ] Test completed trace rejects new events.
-- [ ] Test expired trace rejects new events.
-- [ ] Test metadata with JSON null values is preserved.
-- [ ] Test transition reasons match the audit schema vocabulary.
+- [x] Test first event creates `STARTED`.
+- [x] Test first event with next expected event creates `WAITING_OTHER_EVENT`.
+- [x] Test final event creates `COMPLETED`.
+- [x] Test TTL expiration creates `TTL_EXPIRED_FOR_EVENT`.
+- [x] Test premature TTL expiration is rejected.
+- [x] Test expected event before TTL advances state.
+- [x] Test expected event after TTL is rejected.
+- [x] Test unexpected event is rejected.
+- [x] Test equivalent duplicate event is idempotent.
+- [x] Test different duplicate event returns conflict.
+- [x] Test completed trace rejects new events.
+- [x] Test expired trace rejects new events.
+- [x] Test metadata with JSON null values is preserved.
+- [x] Test transition reasons match the audit schema vocabulary.
 
 ## Phase 6 - Implement Persistence and Transactional Service
 
