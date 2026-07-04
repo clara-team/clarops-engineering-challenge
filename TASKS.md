@@ -29,11 +29,11 @@ This task list tracks the implementation phases for the challenge solution.
 
 ## Phase 4 - Implement Domain Logic
 
-- [ ] Add trace status transition rules.
-- [ ] Add event result handling.
-- [ ] Add domain exceptions for conflicts and missing traces.
-- [ ] Add explicit duplicate payload comparison.
-- [ ] Keep business rules outside controllers.
+- [x] Add trace status transition rules.
+- [x] Add event result handling.
+- [x] Add domain exceptions for conflicts and missing traces.
+- [x] Add explicit duplicate payload comparison.
+- [x] Keep business rules outside controllers.
 
 ## Phase 5 - Implement Persistence
 

@@ -15,11 +15,12 @@ Implemented so far:
 - Phase 1: assumptions, MVP scope, technical decisions, and implementation plan.
 - Phase 2: PostgreSQL DDL for event history, current trace state, and status audit trail.
 - Phase 3: public API DTOs, validation annotations, and API enum values.
+- Phase 4: domain transition rules, conflict exceptions, and duplicate event comparison.
 
 Not implemented yet:
 
 - Public event/status endpoints.
-- Domain transition logic and persistence services.
+- Persistence services.
 - Lazy expiration behavior in application code.
 - Unit tests, Hurl end-to-end tests, and final verification.
 
@@ -110,6 +111,31 @@ Delivered in this phase:
 - Added `ErrorResponse` for standard JSON error responses.
 - Added API enums for event results, trace statuses, and error codes.
 - Added Bean Validation rules for required fields, max string sizes, positive TTL values, paired `nextExpectedEvent`/`nextEventTtlSeconds`, and invalid `finalEvent` combinations.
+
+### Phase 4: Domain Logic
+
+Phase 4 added framework-free domain logic under `com.clara.challenge.event.domain`. The domain layer is intentionally independent from controllers and persistence so later phases can map API requests and database rows into the same transition rules.
+
+Delivered in this phase:
+
+- Added domain event result and trace status enums with the same vocabulary documented by the challenge.
+- Added immutable domain records for incoming events, current trace state, and transition results.
+- Added `EventTransitionService` for first-event and next-event state transitions.
+- Added domain exceptions for event conflicts and missing traces.
+- Added `DuplicateEventComparator` for explicit duplicate `eventId` payload comparison.
+- Kept business rules outside controllers, repositories, and entities.
+
+Domain transition behavior:
+
+- First event with `finalEvent = true` moves the trace to `COMPLETED`.
+- First event with `nextExpectedEvent` and `nextEventTtlSeconds` moves the trace to `WAITING_OTHER_EVENT`.
+- First event without a next expected event and not final moves the trace to `STARTED`.
+- A waiting trace only accepts the exact expected event name.
+- Expected events are accepted when `occurredAt` is on or before `nextExpectedBefore`; events after that deadline are rejected as conflicts.
+- Waiting traces can only be expired after `nextExpectedBefore`; attempts to expire at or before the deadline are rejected.
+- Completed and expired traces reject new events.
+- `SUCCESS` and `ERROR` are stored as event results; they do not directly determine trace status.
+- Equivalent duplicate events are identified by comparing all relevant event fields, including metadata. Metadata is copied defensively while preserving JSON `null` values.
 
 ## API Contract
 

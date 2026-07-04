@@ -203,3 +203,72 @@ Additional requests:
 ### Manual Corrections
 
 - The README was updated cumulatively by adding Phase 3 progress and API contract sections instead of replacing earlier phase notes.
+
+## Phase 4 - Domain Logic
+
+### Prompts and Requests
+
+Main domain prompt:
+
+> Start Phase 4 from the updated `develop` branch and implement the domain logic for the Event Watchdog MVP.
+>
+> Before writing code:
+>
+> - verify the working tree is clean;
+> - run a fresh `git pull --ff-only` on `develop`;
+> - create a new branch named `phase-4-domain-logic`;
+> - review `TASKS.md`, `README.md`, `CHALLENGE_INSTRUCTIONS.md`, and the Phase 3 API contracts.
+>
+> Keep this phase strictly scoped to domain logic. Do not add controllers, JPA entities, repositories, transactional persistence flows, Hurl tests, or global exception handlers.
+>
+> Implement the Phase 4 deliverables:
+>
+> - status enum;
+> - result enum;
+> - transition service;
+> - domain exceptions;
+> - duplicate payload comparison.
+>
+> Add domain code under `src/main/java/com/clara/challenge/event/domain` and keep it framework-free so it can be unit-tested without Spring.
+>
+> Implement transition rules aligned with the README assumptions and challenge behavior:
+>
+> - first event with `finalEvent = true` becomes `COMPLETED`;
+> - first event with `nextExpectedEvent` and `nextEventTtlSeconds` becomes `WAITING_OTHER_EVENT`;
+> - first event without a next expected event and not final becomes `STARTED`;
+> - when a trace is waiting, only the exact `nextExpectedEvent` is accepted;
+> - expected events after the TTL deadline are rejected;
+> - completed traces reject new events;
+> - expired traces reject new events;
+> - event result values `SUCCESS` and `ERROR` are event outcomes, not trace statuses.
+>
+> Add explicit duplicate `eventId` comparison that treats a duplicate as idempotent only when all relevant fields match, including `traceId`, `eventName`, `result`, `occurredAt`, next expected fields, `finalEvent`, and `metadata`. Different payloads for the same `eventId` must be distinguishable as conflicts.
+>
+> Add domain exceptions that later endpoint and persistence phases can map to HTTP responses, including event conflicts and missing traces.
+>
+> Update documentation cumulatively:
+>
+> - mark Phase 4 complete in `TASKS.md`;
+> - add Phase 4 progress and transition behavior to `README.md` without replacing prior phase notes;
+> - update `AI_USAGE.md` with this full Phase 4 prompt, accepted suggestions, rejected suggestions, and manual corrections.
+>
+> Run formatting and verification after the changes. Report warnings separately from failures.
+
+### Accepted Suggestions
+
+- Keep the domain layer framework-free and independent from controllers/persistence.
+- Use immutable records for incoming events, trace state, and transition results.
+- Reuse the same status/result vocabulary as the public API while keeping domain types in a domain package for later mapping.
+- Implement duplicate detection through explicit field-by-field comparison instead of a payload hash.
+
+### Rejected or Adjusted Suggestions
+
+- No Spring service annotations were added because this phase is pure domain logic.
+- No persistence mutation or lazy-expiration storage was added; persistence and endpoint-triggered expiration are assigned to later phases.
+
+### Manual Corrections
+
+- The README was updated as an additive final-solution document by appending Phase 4 progress and behavior notes.
+- A review found that `expireWaitingTrace` could expire a waiting trace before the TTL deadline; the domain service now rejects expiration at or before `nextExpectedBefore`.
+- A review found that `Map.copyOf` rejected metadata entries with JSON `null` values; metadata is now defensively copied with an unmodifiable map that preserves null values.
+
