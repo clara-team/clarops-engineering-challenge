@@ -149,3 +149,4 @@ export DOCKER_COMPOSE_FILE=/absolute/path/to/docker/docker-compose.yml
 
 > You can add your tables to the existing `clarops_challenge_schema` schema or define a new one —
 > both approaches work.
+
