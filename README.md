@@ -18,11 +18,10 @@ Implemented so far:
 - Phase 4: domain transition rules, conflict exceptions, and duplicate event comparison.
 - Phase 5: unit tests for the pure domain transition and duplicate-comparison rules.
 - Phase 6: JPA persistence entities, repositories, and transactional event ingestion service.
+- Phase 7: public event/status endpoints, HTTP error mapping, and lazy TTL expiration on status reads.
 
 Not implemented yet:
 
-- Public event/status endpoints.
-- Lazy expiration behavior in application code.
 - Hurl end-to-end tests and final verification.
 
 ## Scope
@@ -154,7 +153,7 @@ Delivered in this phase:
 
 ### Phase 6: Persistence and Transactional Service
 
-Phase 6 connected the domain layer to the PostgreSQL schema through JPA entities, repositories, and a transactional event ingestion service. Public HTTP endpoints are still assigned to Phase 7, so this phase exposes the persistence flow as an application service that later controllers can call.
+Phase 6 connected the domain layer to the PostgreSQL schema through JPA entities, repositories, and a transactional event ingestion service. This phase exposed the persistence flow as an application service for the Phase 7 controllers.
 
 Delivered in this phase:
 
@@ -166,6 +165,19 @@ Delivered in this phase:
 - Added explicit mapping between persistence entities and framework-free domain records.
 - Added `EventIngestionResult` so later endpoints can distinguish newly accepted events from idempotent duplicates.
 - Added unit tests for the service orchestration paths using mocked repositories, without requiring a real database.
+
+### Phase 7: Endpoints and Lazy Expiration
+
+Phase 7 exposes the public Event Watchdog API through Spring MVC controllers and adds lazy expiration when a waiting trace status is read.
+
+Delivered in this phase:
+
+- Added `POST /events`, returning `201 Created` for newly accepted events and `200 OK` for idempotent duplicate events.
+- Added `GET /traces/{traceId}/status`, delegating to `TraceStatusService` for status reads.
+- Added global exception handling for validation errors, malformed JSON, unknown traces, event conflicts, and unexpected errors.
+- Added `TraceStatusService` lazy expiration: waiting traces whose `nextExpectedBefore` is before the current clock are persisted as `TTL_EXPIRED_FOR_EVENT`, `expired_at` is populated, and a `TTL_EXPIRED` audit row is written.
+- Kept repeated expired status reads idempotent by mutating only traces still in `WAITING_OTHER_EVENT`.
+- Added unit tests for controller status/error mapping and lazy expiration service behavior.
 
 ## API Contract
 
