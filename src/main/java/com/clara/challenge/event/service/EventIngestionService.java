@@ -17,9 +17,12 @@ import com.clara.challenge.event.persistence.TraceStatusAuditRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 @RequiredArgsConstructor
@@ -28,19 +31,25 @@ public class EventIngestionService {
   private final EventRepository eventRepository;
   private final TraceStateRepository traceStateRepository;
   private final TraceStatusAuditRepository traceStatusAuditRepository;
+  private final PlatformTransactionManager transactionManager;
 
   private final Clock clock = Clock.systemUTC();
   private final EventTransitionService transitionService = new EventTransitionService();
   private final DuplicateEventComparator duplicateComparator = new DuplicateEventComparator();
 
-  @Transactional
   public EventIngestionResult ingest(IncomingEvent event) {
     Objects.requireNonNull(event, "event is required");
 
-    return eventRepository
-        .findByEventId(event.eventId())
-        .map(existingEvent -> handleDuplicateEvent(existingEvent, event))
-        .orElseGet(() -> ingestNewEvent(event));
+    try {
+      return inTransaction(
+          () ->
+              eventRepository
+                  .findByEventId(event.eventId())
+                  .map(existingEvent -> handleDuplicateEvent(existingEvent, event))
+                  .orElseGet(() -> ingestNewEvent(event)));
+    } catch (DataIntegrityViolationException exception) {
+      return inTransaction(() -> handleConcurrentDuplicateEvent(event, exception));
+    }
   }
 
   private EventIngestionResult handleDuplicateEvent(
@@ -75,12 +84,26 @@ public class EventIngestionService {
             ? transitionService.applyFirstEvent(event)
             : transitionService.applyNextEvent(currentState, event);
 
-    eventRepository.save(eventEntity);
+    eventRepository.saveAndFlush(eventEntity);
+
     saveTraceState(currentStateEntity, transitionResult.traceState());
     saveAudit(
         currentState == null ? null : currentState.status(), transitionResult, event.eventId());
 
     return new EventIngestionResult(transitionResult.traceState(), false);
+  }
+
+  private EventIngestionResult handleConcurrentDuplicateEvent(
+      IncomingEvent event, DataIntegrityViolationException exception) {
+    return eventRepository
+        .findByEventId(event.eventId())
+        .map(existingEvent -> handleDuplicateEvent(existingEvent, event))
+        .orElseThrow(() -> exception);
+  }
+
+  private EventIngestionResult inTransaction(Supplier<EventIngestionResult> action) {
+    return Objects.requireNonNull(
+        new TransactionTemplate(transactionManager).execute(status -> action.get()));
   }
 
   private void saveTraceState(TraceStateEntity currentStateEntity, TraceState nextState) {

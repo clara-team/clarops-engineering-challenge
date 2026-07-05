@@ -162,6 +162,7 @@ Delivered in this phase:
 - Added repositories for event lookup by `eventId`, trace-state lookup/update, and audit persistence.
 - Added a pessimistic write lock for loading existing trace state during event ingestion.
 - Added `EventIngestionService` to run event ingestion in one transaction: detect duplicate `eventId`, persist immutable event history, apply domain transition rules, update current trace state, and write an audit row.
+- Flushes new event inserts before state mutation and reloads duplicate rows on unique insert conflicts so concurrent retries take the documented duplicate path instead of surfacing persistence errors.
 - Added explicit mapping between persistence entities and framework-free domain records.
 - Added `EventIngestionResult` so later endpoints can distinguish newly accepted events from idempotent duplicates.
 - Added unit tests for the service orchestration paths using mocked repositories, without requiring a real database.

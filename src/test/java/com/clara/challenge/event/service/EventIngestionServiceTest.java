@@ -22,12 +22,18 @@ import com.clara.challenge.event.persistence.TraceStatusAuditRepository;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 @ExtendWith(MockitoExtension.class)
 class EventIngestionServiceTest {
@@ -37,8 +43,15 @@ class EventIngestionServiceTest {
   @Mock private EventRepository eventRepository;
   @Mock private TraceStateRepository traceStateRepository;
   @Mock private TraceStatusAuditRepository traceStatusAuditRepository;
+  @Mock private PlatformTransactionManager transactionManager;
 
   @InjectMocks private EventIngestionService service;
+
+  @BeforeEach
+  void setUpTransactionManager() {
+    when(transactionManager.getTransaction(ArgumentMatchers.any(TransactionDefinition.class)))
+        .thenReturn(new SimpleTransactionStatus());
+  }
 
   @Test
   void shouldPersistEventStateAndAudit_WhenFirstEventIsAccepted() {
@@ -57,7 +70,7 @@ class EventIngestionServiceTest {
     ArgumentCaptor<TraceStatusAuditEntity> auditCaptor =
         ArgumentCaptor.forClass(TraceStatusAuditEntity.class);
 
-    verify(eventRepository).save(eventCaptor.capture());
+    verify(eventRepository).saveAndFlush(eventCaptor.capture());
     verify(traceStateRepository).save(stateCaptor.capture());
     verify(traceStatusAuditRepository).save(auditCaptor.capture());
 
@@ -85,7 +98,7 @@ class EventIngestionServiceTest {
 
     ArgumentCaptor<TraceStatusAuditEntity> auditCaptor =
         ArgumentCaptor.forClass(TraceStatusAuditEntity.class);
-    verify(eventRepository).save(any(EventEntity.class));
+    verify(eventRepository).saveAndFlush(any(EventEntity.class));
     verify(traceStateRepository).save(currentState);
     verify(traceStatusAuditRepository).save(auditCaptor.capture());
 
@@ -111,6 +124,27 @@ class EventIngestionServiceTest {
     assertThat(result.idempotentDuplicate()).isTrue();
     assertThat(result.traceState()).isEqualTo(currentState);
     verify(eventRepository, never()).save(any(EventEntity.class));
+    verify(traceStateRepository, never()).save(any(TraceStateEntity.class));
+    verify(traceStatusAuditRepository, never()).save(any(TraceStatusAuditEntity.class));
+  }
+
+  @Test
+  void shouldReturnCurrentStateWithoutMutating_WhenConcurrentInsertFindsDuplicateEvent() {
+    IncomingEvent event = event("event-1", "payment-created");
+    TraceState currentState = startedState();
+    EventEntity existingEvent = EventEntity.from(event, OCCURRED_AT.plusSeconds(1));
+    when(eventRepository.findByEventId(event.eventId()))
+        .thenReturn(Optional.empty(), Optional.of(existingEvent));
+    when(traceStateRepository.lockByTraceId(event.traceId())).thenReturn(Optional.empty());
+    when(eventRepository.saveAndFlush(any(EventEntity.class)))
+        .thenThrow(new DataIntegrityViolationException("duplicate event_id"));
+    when(traceStateRepository.findById(event.traceId()))
+        .thenReturn(Optional.of(TraceStateEntity.from(currentState)));
+
+    EventIngestionResult result = service.ingest(event);
+
+    assertThat(result.idempotentDuplicate()).isTrue();
+    assertThat(result.traceState()).isEqualTo(currentState);
     verify(traceStateRepository, never()).save(any(TraceStateEntity.class));
     verify(traceStatusAuditRepository, never()).save(any(TraceStatusAuditEntity.class));
   }

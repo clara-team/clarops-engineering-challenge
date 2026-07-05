@@ -324,7 +324,7 @@ Implement:
 - a transactional event ingestion service that detects duplicate eventId, compares duplicate payloads explicitly, persists accepted event history, applies EventTransitionService rules, updates current trace state, and writes audit rows for accepted transitions;
 - an ingestion result that later endpoints can use to distinguish new accepted events from idempotent duplicates.
 
-Use the existing domain services instead of duplicating transition rules in persistence code. Keep duplicate retries idempotent by returning current trace state without inserting another event or mutating trace state. Preserve JSON metadata as JSONB.
+Use the existing domain services instead of duplicating transition rules in persistence code. Keep duplicate retries idempotent by returning current trace state without inserting another event or mutating trace state. Protect concurrent retries of the same event by flushing event inserts before state mutation and reloading/comparing the duplicate row if the insert hits a unique constraint. Preserve JSON metadata as JSONB.
 
 Add unit tests for the Phase 6 service orchestration using the same standard from Phase 5:
 - Use JUnit 5, AssertJ, and Mockito.
@@ -338,6 +338,7 @@ Cover:
 - first accepted event saves event history, creates trace state, and writes an audit row;
 - expected event on an existing waiting trace updates trace state and writes an audit row;
 - equivalent duplicate event returns the current trace state without inserting or mutating;
+- concurrent duplicate insert conflict reloads the existing event and returns the idempotent duplicate result;
 - conflicting duplicate event raises EventConflictException and does not write state or audit rows.
 
 Update TASKS.md, README.md, and AI_USAGE.md cumulatively for Phase 6, and run formatting plus tests.
@@ -350,7 +351,7 @@ Update TASKS.md, README.md, and AI_USAGE.md cumulatively for Phase 6, and run fo
 - Added `EventIngestionService` as the transactional application boundary for event ingestion.
 - Reused `EventTransitionService` and `DuplicateEventComparator` instead of duplicating business rules in the persistence layer.
 - Added entity-to-domain mapping so persistence rows can be passed into the domain layer.
-- Added mocked unit tests for new-event ingestion, expected-event ingestion, idempotent duplicate handling, and conflicting duplicate handling.
+- Added mocked unit tests for new-event ingestion, expected-event ingestion, idempotent duplicate handling, concurrent duplicate insert handling, and conflicting duplicate handling.
 
 ### Rejected or Adjusted Suggestions
 
