@@ -289,6 +289,7 @@ Use the following testing standard:
 - Avoid Spring context because the tested classes are pure domain code.
 - Use fixed Instants for time-dependent rules.
 - Do not add tests for behavior outside the challenge requirements unless clearly tied to a documented assumption.
+- Make the requirement or assumption validated by each test clear from the test name and assertions.
 
 Cover EventTransitionService business rules, DuplicateEventComparator duplicate classification, metadata preservation with JSON null values, and TransitionReason values matching the audit schema vocabulary. Keep the tests focused, readable, and aligned with the existing domain API.
 ```
@@ -301,4 +302,59 @@ Cover EventTransitionService business rules, DuplicateEventComparator duplicate 
 ### Rejected or Adjusted Suggestions
 
 - No Spring context was used for Phase 5 tests because the tested logic is pure domain code.
+
+## Phase 6 - Persistence and Transactional Service
+
+### Prompt Used
+
+```text
+Start Phase 6 from the updated develop branch and implement the persistence layer plus transactional event ingestion service for the Event Watchdog MVP.
+
+Before writing code:
+- verify the working tree is clean;
+- create a new branch named phase-6-persistence-service;
+- review CHALLENGE_INSTRUCTIONS.md, README.md, TASKS.md, the Phase 2 DDL, Phase 4 domain code, and Phase 5 tests.
+
+Keep this phase strictly scoped to persistence and service orchestration. Do not add REST controllers, endpoint exception mapping, lazy expiration on status reads, Hurl tests, or final documentation.
+
+Implement:
+- JPA entities for events, trace_state, and trace_status_audit, mapped to the existing PostgreSQL schema;
+- repositories for event lookup by eventId, trace state lookup/update, and audit insertion;
+- mapping between JPA entities and the framework-free domain records;
+- a transactional event ingestion service that detects duplicate eventId, compares duplicate payloads explicitly, persists accepted event history, applies EventTransitionService rules, updates current trace state, and writes audit rows for accepted transitions;
+- an ingestion result that later endpoints can use to distinguish new accepted events from idempotent duplicates.
+
+Use the existing domain services instead of duplicating transition rules in persistence code. Keep duplicate retries idempotent by returning current trace state without inserting another event or mutating trace state. Preserve JSON metadata as JSONB.
+
+Add unit tests for the Phase 6 service orchestration using the same standard from Phase 5:
+- Use JUnit 5, AssertJ, and Mockito.
+- Test method names must follow shouldExpectedBehavior_WhenCondition.
+- Use Arrange / Act / Assert structure.
+- Each test should validate one service rule or persistence interaction.
+- Avoid a real database; mock repositories and capture saved entities.
+- Do not test public HTTP behavior because endpoints belong to Phase 7.
+
+Cover:
+- first accepted event saves event history, creates trace state, and writes an audit row;
+- expected event on an existing waiting trace updates trace state and writes an audit row;
+- equivalent duplicate event returns the current trace state without inserting or mutating;
+- conflicting duplicate event raises EventConflictException and does not write state or audit rows.
+
+Update TASKS.md, README.md, and AI_USAGE.md cumulatively for Phase 6, and run formatting plus tests.
+```
+
+### Accepted Suggestions
+
+- Added JPA entities aligned with the existing DDL for immutable events, current trace state, and trace status audit.
+- Added Spring Data repositories, including event lookup by `eventId` and a pessimistic write lock for existing trace state during ingestion.
+- Added `EventIngestionService` as the transactional application boundary for event ingestion.
+- Reused `EventTransitionService` and `DuplicateEventComparator` instead of duplicating business rules in the persistence layer.
+- Added entity-to-domain mapping so persistence rows can be passed into the domain layer.
+- Added mocked unit tests for new-event ingestion, expected-event ingestion, idempotent duplicate handling, and conflicting duplicate handling.
+
+### Rejected or Adjusted Suggestions
+
+- No REST controllers or HTTP status mapping were added because endpoints are assigned to Phase 7.
+- No lazy expiration on status reads was added because endpoint-triggered expiration belongs to Phase 7.
+- Idempotent duplicate retries return the current trace state without writing another event row or mutating trace state.
 

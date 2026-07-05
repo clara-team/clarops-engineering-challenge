@@ -54,13 +54,14 @@ This task list tracks the implementation phases for the challenge solution.
 
 ## Phase 6 - Implement Persistence and Transactional Service
 
-- [ ] Add event entity and repository.
-- [ ] Add trace state entity and repository.
-- [ ] Add trace status audit entity and repository.
-- [ ] Map persistence rows to domain records.
-- [ ] Implement transactional event ingestion.
-- [ ] Use domain transition rules and duplicate comparison.
-- [ ] Keep event history, current state, and audit rows consistent.
+- [x] Add event entity and repository.
+- [x] Add trace state entity and repository.
+- [x] Add trace status audit entity and repository.
+- [x] Map persistence rows to domain records.
+- [x] Implement transactional event ingestion.
+- [x] Use domain transition rules and duplicate comparison.
+- [x] Keep event history, current state, and audit rows consistent.
+- [x] Add unit tests for transactional event ingestion.
 
 ## Phase 7 - Implement Endpoints and Lazy Expiration
 
