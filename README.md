@@ -6,7 +6,7 @@
 
 # A distibuted event watchdog
 
-I could call it "Event noter watchdog" instead haha. But it is ok.
+Let me explain.
 
 We have many systems in our company. All of them have useful information for us, and many of them are just part of a bigger flow. We have been asking to all the leaders of each team to provide an endpoint so we can ask for the status to each service and figure out what is the status of a single traceId (the id of a flow or process). We have been trying to acomplish this for 2 and a half years. We have dealth with:
 
@@ -17,13 +17,11 @@ We have many systems in our company. All of them have useful information for us,
 So we started to thing about what WE could do. We made a survey with all of the teams to know what data could they provide to us; they were not very friendly, though, they were very bussy as always. Even though, it was better for us because we got just a small number of fields. In this case tha say was true: less was better. All the teams agreed to give us this data:
 
 ```
-  event_id
-  trace_id
-  event_name
-  result
-  occurred_at
+  event_id - an id
+  trace_id - an id of the artifact that was being processed 
+  event_name - name of an event; what names were allowed? Haha, we'll talk about it later.
+  result - this was only SUCCESS or ERROR; not more 
+  occurred_at - datetime at which this happened from their point of view
 ```
 
 And they could send it almost for free. They had this big and complicated infrastructure with kafka topics and consumers that they could use to send us the data, and it will be ready this Monday.
-
-U
