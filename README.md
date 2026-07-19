@@ -49,3 +49,22 @@ Done! We've got it! Right? (spoiler alert, no). To finalize this short story, th
 Whad did we ended up doing? This is a story for another paragraph.
 
 **== end of story**
+
+**So, how did we decouple?**
+
+We do not read **eventName**. It is just a string for us. We never map a name to a status. If we would've done that, we would be copying their business rules again.
+
+So what do we ask? 3 things:
+
+1. Did the event promise another one? (**nextExpectedEvent** and **nextEventTtlSeconds**)
+2. Did the event say it was the last one? (**finalEvent**)
+3. What time is it?
+
+And can we infer the four statuses with only that? Yes:
+
+1. **STARTED**. First event. It promised nothing and it did not close the flow.
+2. **WAITING_OTHER_EVENT**. Something was promised and the deadline has not passed.
+3. **TTL_EXPIRED_FOR_EVENT**. The deadline passed and the event never arrived.
+4. **COMPLETED**. An event said it was the last one.
+
+And the main decision: we do not save the status. We calculate it when someone asks. Like we said in the meeting, time decides.
