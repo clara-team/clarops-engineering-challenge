@@ -33,24 +33,13 @@ We knew what we wanted. We scheduled a meeting with the 150 leaders and we reque
 
 To make the story short, all teams agreed to give us these 9 fields: **event_id**, **trace_id**, **event_name**, **result**, **occurred_at**, **next_expecte_before**, **next_event_ttl_seconds**, **final_event** and **metadata**. And they could send it almost for free. They had this big and complicated infrastructure with kafka topics, consumers and http-senders, that they could use to send us the data, and it will be ready this Monday.
 
-Done! We've got it! Right? (spoiler alert, no). To finalize this short story, the questions we did NOT answer that day:
-
-1. Was **event_id** enough for deduplication? (they do retry...)
-2. What if a service sends an event we were not expecting?
-3. What if the expected event arrives **after** we already called it expired?
-4. What is the most important clock? theirs (**occurredAt**) or ours (when the event arrived to us)?
-5. Can a finished flow keep receiving events?
-6. What if the very first event is also the last one?
-7. If a step failed (**ERROR**) but still promises a next event, do we keep waiting?
-8. What do we do with the extra data they may attach?
-9. How do we keep our own snapshot from lying to us?
-10. What do we answer when someone asks for a **trace_id** we have never seen?
+Done! We've got it! Right? (spoiler alert, no).
 
 Whad did we ended up doing? This is a story for another paragraph.
 
 **== end of story**
 
-**So, how did we decouple?**
+### **So, how did we decouple?**
 
 We do not read **eventName**. It is just a string for us. We never map a name to a status. If we would've done that, we would be copying their business rules again.
 
@@ -68,3 +57,24 @@ And can we infer the four statuses with only that? Yes:
 4. **COMPLETED**. An event said it was the last one.
 
 And the main decision: we do not save the status. We calculate it when someone asks. Like we said in the meeting, time decides.
+
+## 2. Technical decisions
+
+These are the questions we did NOT answer that day. For each one: what could be going on, what we do for this MVP, and the trade-off.
+
+1. Was **event_id** enough for deduplication? (they do retry...)
+
+    **[What could be going on?]** What does it mean that we receive dplicated events? For the moment event_id will be useful to deduplicate, but:
+
+    - Do the originator has a bug?
+    - Was the event sent from a place where internet was not available or intermintent, and thus, several intents arrived?
+    - Are we a target by a hacker? Do the duplicates have the same content? Are there arriving close to each other of after hours, days months?
+
+    **[Approach for this MVP]** At the moment of writing the MVP we decided to assume that:
+
+    - The duplicated events are rare and we will try to prove it by logging every event arriving more than once, and scheduling a manual check every week. If we see weird things in the logs, then we can take action.
+    - We'll consider that there's no bad intention when duplicates arrive.
+    - Also our devops team is logging every request going into our infrastructure and our service is behind a VPN.
+    - Since for the moment, looks that the risk is low, we'll return OK (200) to duplicates, but we will not be saving duplicates, and also we'll not let duplicates update our databae.
+
+     **[The trade-off]** If somebody reuses an eventId for a different event, we will drop it, losing information. The weekly log check is our only safety net for that.
