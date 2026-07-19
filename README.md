@@ -60,21 +60,92 @@ And the main decision: we do not save the status. We calculate it when someone a
 
 ## 2. Technical decisions
 
-These are the questions we did NOT answer that day. For each one: what could be going on, what we do for this MVP, and the trade-off.
+These are the questions we did NOT answer that day. They are not 13 separate decisions: once we started answering them we saw that many of them were the same decision looked at from a different angle, so we grouped them. For each group: what could be going on, what we do for this MVP, and the trade-off.
+
+Three of these questions were not on the list. Nobody asked them in that meeting, we found them later, on our own they are marked.
+
+### A. When a strange event arrives
 
 1. Was **event_id** enough for deduplication? (they do retry...)
+2. What if a service sends an event we were not expecting?
+3. What if the expected event arrives **after** we already called it expired?
+5. Can a finished flow keep receiving events?
+12. What if an event arrives with an **occurredAt** older than the last one we already stored? (we found this one later)
 
-    **[What could be going on?]** What does it mean that we receive dplicated events? For the moment event_id will be useful to deduplicate, but:
+**[What could be going on?]** What does it mean that we receive unexpected events?
 
-    - Do the originator has a bug?
-    - Was the event sent from a place where internet was not available or intermintent, and thus, several intents arrived?
-    - Are we a target by a hacker? Do the duplicates have the same content? Are there arriving close to each other of after hours, days months?
+- Do the originator has a bug?
+- Was the event sent from a place where internet was not available or intermintent, and thus, several intents arrived?
+- Are we a target of a hacker? Do the duplicates have the same content? Are there arriving close to each other of after hours, days months?
+- Maybe the client is sending some event in lowercase and some events in upper case.
+- Maybe they are just using kafka with different partitions and thus, some events are sent in the wrong order?
 
-    **[Approach for this MVP]** At the moment of writing the MVP we decided to assume that:
+**[Approach for this MVP]** 
 
-    - The duplicated events are rare and we will try to prove it by logging every event arriving more than once, and scheduling a manual check every week. If we see weird things in the logs, then we can take action.
-    - We'll consider that there's no bad intention when duplicates arrive.
-    - Also our devops team is logging every request going into our infrastructure and our service is behind a VPN.
-    - Since for the moment, looks that the risk is low, we'll return OK (200) to duplicates, but we will not be saving duplicates, and also we'll not let duplicates update our databae.
+- We will not introduce a sorting feature for the moment, which we might actually need in the future.
+- Even if they are using some weird configuration in kafka, we should let that team know about this.
+- The duplicated events are rare and we will try to prove it by logging every event arriving more than once, and scheduling a manual check every week. If we see weird things in the logs, then we can take action.
+- We'll consider that there's no bad intention when unexpected events arrive. For the moment, we will be interested in saving facts. We want feedback and facts are facts.
+- Also our devops team is logging every request going into our infrastructure and our service is behind a VPN.
 
-     **[The trade-off]** If somebody reuses an eventId for a different event, we will drop it, losing information. The weekly log check is our only safety net for that.
+Now almost everything gets stored because they are facts, we'll deal with specific exceptions in other iterations, when we HAVE MORE INFO. But we need to know when we allow to update the snapshot (the trace state).
+
+A normal event is persisted and updates the snapshot, returning 201. Dealing with special cases has to have an order because these cases overlap. The same event can be old, late and unexpected at the same time, so what we look at first is what decides the answer. We already learned this when we defined the four statuses: checking TTL before completion would report a closed flow as expired.
+
+So we will:
+1. Since for the moment, looks that the risk is low, we'll return OK (200) to duplicates, but we will not be saving duplicates, and also we'll not let duplicates update our databae.
+2. If the trace is already COMPLETED, we keep the event and answer 200. But the snapshot does not move. A closed flow stays closed.
+3. If the event is older than the last one we stored, we keep it and answer 200. But it does not move the snapshot. It happened, it is just not the newest thing that happened.
+4. If he TTL was already over, we keep it and we DO let it move the snapshot. The flow comes back to life. We are not going to chase every employee working where the internet signal is bad. And the log will tell us who they are anyway.
+5. If the `eventName` is not the one we were told to expect, we keep it and answer 409. They told us to wait for X and Y arrived. So officially, this IS a conflict. We want to see those 409 and find out what the sender was attempting. And the snapshot does not move.
+
+**[The trade-off]** 
+- The MAIN one: our status can change. Today we say expired. Tomorrow the late event arrives and we say waiting. So if you ask twice, you get two answers. We take that. Saying a flow is dead when it was only slow is worse.
+- We drop duplicates. So if somebody reuses an eventId for a different event, that event is lost. The weekly log is our only safety net.
+- Kafka sends events out of order. And we answer 409 when the name is not the one we expected. So a 409 will not always mean somebody did something wrong.
+- If a team marks finalEvent by mistake, that flow is closed forever. And it looks the same as a flow that really ended.
+
+
+### B. Whose clock we trust
+
+4. What is the most important clock? theirs (**occurredAt**) or ours (when the event arrived to us)?
+13. Do we trust their clock even when it is clearly wrong? (we found this one later)
+
+**[What could be going on?]** 
+
+**[Approach for this MVP]** 
+
+**[The trade-off]** 
+
+### C. How we read what an event promises
+
+6. What if the very first event is also the last one?
+7. If a step failed (**ERROR**) but still promises a next event, do we keep waiting?
+11. What if they promise a next event but they do not say for how long? (we found this one later)
+
+**[What could be going on?]** 
+
+**[Approach for this MVP]** 
+
+**[The trade-off]** 
+
+### D. The loose ones
+
+8. What do we do with the extra data they may attach?
+
+**[Approach for this MVP]** 
+
+**[The trade-off]**
+
+9. How do we keep our own snapshot from lying to us?
+
+**[Approach for this MVP]** 
+
+**[The trade-off]** 
+
+10. What do we answer when someone asks for a **trace_id** we have never seen?
+
+**[Approach for this MVP]** 
+
+**[The trade-off]** 
+
