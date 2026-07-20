@@ -1,0 +1,358 @@
+# unit_tests.gwt
+#
+# Derived from unit_tests.spec.md. Every block is INDEPENDENT and self contained:
+# copy any one of them as is and hand it to /gwt-pseudo-code-test-to-minimal-implementation
+# without needing anything from its neighbours.
+#
+# Each block declares what has to EXIST before it can run: the schema, the tables, the
+# endpoint, the domain type. Those are given_ lines too, on purpose. If something in there
+# does not exist yet, that is the first thing to build.
+#
+# The given_ lines repeat on purpose. Another skill will organise them later.
+#
+# Marks: [T#] [I#] [H#] = test key. dep: = the TASKS.md task that must exist first.
+
+
+# ============================================================
+# BLOCK 1 — Pure domain. No Spring, no database, no HTTP.
+# ============================================================
+
+
+# [T1] dep: 3.1 — live promise, the clock has not crossed the deadline
+given_the_ddl_is_applied()
+given_the_table_exists("events")
+given_the_table_exists("trace_state")
+given_the_endpoint_exists("POST /api/events")
+given_the_endpoint_exists("GET /api/traces/{traceId}/status")
+given_the_clock_is_fixed_at("2026-06-15T10:01:00Z")
+trace_id = given_a_trace_whose_last_event_promised(
+    event_id    = "evt-001",
+    event_name  = "APPLICATION_RECEIVED",
+    result      = "SUCCESS",
+    occurred_at = "2026-06-15T10:00:00Z",
+    promises    = "RULES_EVALUATED",
+    ttl_seconds = 120)
+status = when_the_status_is_asked_via_get_endpoint("GET", f"/api/traces/{trace_id}/status")
+then_the_status_trace_id_is(trace_id, WAITING_OTHER_EVENT)
+
+# [T2] dep: 3.1 — SAME snapshot as T1, only the clock changed.
+# Nobody wrote anything and the answer changed. This is the test of the project.
+given_the_domain_type_exists("TraceSnapshot")
+given_a_trace_whose_last_event_promised("RULES_EVALUATED")
+given_the_deadline_is("2026-06-15T10:02:00Z")
+status = when_the_status_is_asked_at("2026-06-15T10:03:00Z")
+then_the_status_is(TTL_EXPIRED_FOR_EVENT)
+
+
+# [T3] dep: 3.1 — the clock sits exactly on the deadline. It expires only AFTER.
+given_the_domain_type_exists("TraceSnapshot")
+given_a_trace_whose_last_event_promised("RULES_EVALUATED")
+given_the_deadline_is("2026-06-15T10:02:00Z")
+status = when_the_status_is_asked_at("2026-06-15T10:02:00Z")
+then_the_status_is(WAITING_OTHER_EVENT)
+
+
+# [R2] dep: 3.1 — first event, promises nothing and does not close the flow
+given_the_domain_type_exists("TraceSnapshot")
+given_a_trace_whose_last_event_promised_nothing()
+given_the_trace_is_not_completed()
+status = when_the_status_is_asked_at("2026-06-15T10:01:00Z")
+then_the_status_is(STARTED)
+
+
+# [T4] dep: 3.1 — the very first event already carries finalEvent
+given_the_domain_type_exists("TraceSnapshot")
+given_a_trace_whose_first_event_was_final()
+status = when_the_status_is_asked_at("2026-06-15T10:01:00Z")
+then_the_status_is(COMPLETED)
+
+
+# [T8] dep: 3.1 — half a promise: there is a nextExpectedEvent but no deadline
+given_the_domain_type_exists("TraceSnapshot")
+given_a_trace_whose_last_event_promised("RULES_EVALUATED")
+given_there_is_no_deadline()
+status = when_the_status_is_asked_at("2026-06-15T23:59:00Z")
+then_the_status_is(STARTED)
+
+
+# [T5] dep: 3.1 — closed trace carrying an old deadline that already passed.
+# COMPLETED is asked before TTL.
+given_the_domain_type_exists("TraceSnapshot")
+given_a_trace_that_was_completed_at("2026-06-15T10:05:00Z")
+given_the_deadline_is("2026-06-15T10:02:00Z")
+status = when_the_status_is_asked_at("2026-06-15T10:30:00Z")
+then_the_status_is(COMPLETED)
+
+
+# [T5] dep: 3.1 — closed trace and the clock moves a lot. It never expires.
+given_the_domain_type_exists("TraceSnapshot")
+given_a_trace_that_was_completed_at("2026-06-15T10:05:00Z")
+given_the_deadline_is("2026-06-15T10:02:00Z")
+status = when_the_status_is_asked_at("2027-01-01T00:00:00Z")
+then_the_status_is(COMPLETED)
+
+
+# [T6] dep: 3.1 — closed, but the last step failed. result is not the status.
+given_the_domain_type_exists("TraceSnapshot")
+given_a_trace_that_was_completed_at("2026-06-15T10:05:00Z")
+given_the_last_event_result_was(ERROR)
+status = when_the_status_is_asked_at("2026-06-15T10:06:00Z")
+then_the_status_is(COMPLETED)
+then_the_last_event_result_is(ERROR)
+
+
+# [T7] dep: 3.1 — a step failed but it promised another event. We keep waiting.
+given_the_domain_type_exists("TraceSnapshot")
+given_a_trace_whose_last_event_result_was(ERROR)
+given_a_trace_whose_last_event_promised("PAYMENT_RETRIED")
+given_the_deadline_is("2026-06-15T10:02:00Z")
+status = when_the_status_is_asked_at("2026-06-15T10:01:00Z")
+then_the_status_is(WAITING_OTHER_EVENT)
+
+
+# [R7] dep: 3.1 — every step succeeded and it expires anyway.
+given_the_domain_type_exists("TraceSnapshot")
+given_a_trace_whose_last_event_result_was(SUCCESS)
+given_a_trace_whose_last_event_promised("RULES_EVALUATED")
+given_the_deadline_is("2026-06-15T10:02:00Z")
+status = when_the_status_is_asked_at("2026-06-15T10:03:00Z")
+then_the_status_is(TTL_EXPIRED_FOR_EVENT)
+
+
+# [T9] dep: 3.1 — already expired, the late event arrives promising another one
+given_the_domain_type_exists("TraceSnapshot")
+given_a_trace_that_already_expired_at("2026-06-15T10:02:00Z")
+snapshot = when_the_expected_event_arrives_promising("SCORE_CALCULATED", ttl_seconds = 120)
+status = when_the_status_is_asked_at("2026-06-15T10:06:00Z")
+then_the_status_is(WAITING_OTHER_EVENT)
+
+
+# [T9] dep: 3.1 — already expired, the late event arrives promising nothing
+given_the_domain_type_exists("TraceSnapshot")
+given_a_trace_that_already_expired_at("2026-06-15T10:02:00Z")
+snapshot = when_the_expected_event_arrives_promising_nothing()
+status = when_the_status_is_asked_at("2026-06-15T10:06:00Z")
+then_the_status_is(STARTED)
+
+
+# [T9] dep: 3.1 — already expired, the late event arrives and closes the flow
+given_the_domain_type_exists("TraceSnapshot")
+given_a_trace_that_already_expired_at("2026-06-15T10:02:00Z")
+snapshot = when_the_expected_event_arrives_as_final()
+status = when_the_status_is_asked_at("2026-06-15T10:06:00Z")
+then_the_status_is(COMPLETED)
+
+
+# [T10] dep: 2.4 — the deadline is calculated once, from occurredAt (THEIR clock)
+given_the_domain_type_exists("TraceSnapshot")
+occurred_at = "2026-06-15T10:00:00Z"
+ttl_seconds = 120
+given_an_event_that_occurred_at(occurred_at)
+given_an_event_that_promises_a_next_one_within(ttl_seconds)
+deadline = when_the_deadline_is_calculated()
+then_the_deadline_is("2026-06-15T10:02:00Z")
+
+
+# [T11] dep: 3.1 — the name is compared as a string. There is no name to status table.
+given_the_domain_type_exists("TraceSnapshot")
+given_a_trace_waiting_for_an_event_named("RULES_EVALUATED")
+matches = when_an_event_named_arrives("RULES_EVALUATED")
+then_the_event_is_recognized_as_the_expected_one(matches)
+
+
+# ============================================================
+# BLOCK 2 — Ingestion against a real Postgres
+# ============================================================
+
+
+# [dep: 1.1, 2.1, 2.2] — happy path
+given_the_ddl_is_applied()
+given_the_table_exists("events")
+given_the_table_exists("trace_state")
+given_the_endpoint_exists("POST /api/events")
+event = given_a_valid_event_that_promises_a_next_one()
+response = when_the_event_is_posted(event)
+then_the_response_status_is(201)
+then_the_event_was_stored(event)
+then_the_snapshot_was_created_for_that_trace(event)
+
+
+# [R12] dep: 1.2, 2.3 — event and snapshot in a single transaction
+given_the_ddl_is_applied()
+given_the_table_exists("events")
+given_the_table_exists("trace_state")
+given_the_endpoint_exists("POST /api/events")
+event = given_a_valid_event()
+given_the_snapshot_write_will_fail()
+response = when_the_event_is_posted(event)
+then_no_event_row_exists(event)
+then_no_snapshot_row_exists(event)
+
+
+# [dep: 2.1] — a required field is missing
+given_the_ddl_is_applied()
+given_the_table_exists("events")
+given_the_endpoint_exists("POST /api/events")
+event = given_an_event_without_its("occurredAt")
+response = when_the_event_is_posted(event)
+then_the_response_status_is(400)
+then_nothing_was_stored()
+
+
+# [dep: 2.1] — result is outside the two allowed values
+given_the_ddl_is_applied()
+given_the_table_exists("events")
+given_the_endpoint_exists("POST /api/events")
+event = given_an_event_whose_result_is("MAYBE")
+response = when_the_event_is_posted(event)
+then_the_response_status_is(400)
+then_nothing_was_stored()
+
+
+# [I1] dep: 1.1, 5.1 — the same eventId twice
+given_the_ddl_is_applied()
+given_the_table_exists("events")
+given_the_table_exists("trace_state")
+given_the_endpoint_exists("POST /api/events")
+given_an_event_already_stored_with_id("evt-001")
+snapshot_before = given_the_current_snapshot()
+response = when_an_event_is_posted_with_id("evt-001")
+then_the_response_status_is(200)
+then_only_one_event_row_exists_with_id("evt-001")
+then_the_snapshot_is_still(snapshot_before)
+
+
+# [I2] dep: 5.2 — the trace is already closed and another event arrives
+given_the_ddl_is_applied()
+given_the_table_exists("events")
+given_the_table_exists("trace_state")
+given_the_endpoint_exists("POST /api/events")
+given_a_completed_trace("trace-123")
+snapshot_before = given_the_current_snapshot()
+response = when_a_new_event_is_posted_for("trace-123")
+then_the_response_status_is(200)
+then_the_event_was_stored()
+then_the_snapshot_is_still(snapshot_before)
+
+
+# [I3] dep: 5.3 — an event older than the last one stored arrives
+given_the_ddl_is_applied()
+given_the_table_exists("events")
+given_the_table_exists("trace_state")
+given_the_endpoint_exists("POST /api/events")
+given_a_trace_whose_last_event_occurred_at("2026-06-15T10:05:00Z")
+snapshot_before = given_the_current_snapshot()
+response = when_an_event_is_posted_that_occurred_at("2026-06-15T10:01:00Z")
+then_the_response_status_is(200)
+then_the_event_was_stored()
+then_the_snapshot_is_still(snapshot_before)
+
+
+# [I4] dep: 5.4 — an eventName different from the expected one arrives
+given_the_ddl_is_applied()
+given_the_table_exists("events")
+given_the_table_exists("trace_state")
+given_the_endpoint_exists("POST /api/events")
+given_a_trace_waiting_for_an_event_named("RULES_EVALUATED")
+snapshot_before = given_the_current_snapshot()
+response = when_an_event_is_posted_named("SCORE_CALCULATED")
+then_the_response_status_is(409)
+then_the_event_was_stored()
+then_the_snapshot_is_still(snapshot_before)
+
+
+# [R9] dep: 1.1 — metadata is stored as it arrives and never interpreted
+given_the_ddl_is_applied()
+given_the_table_exists("events")
+given_the_endpoint_exists("POST /api/events")
+metadata = { "country": "MX", "entityId": "company-123" }
+event = given_a_valid_event_carrying(metadata)
+response = when_the_event_is_posted(event)
+then_the_stored_metadata_is_exactly(metadata)
+
+
+# [dep: 5.5] — two events of the same trace at the same time
+given_the_ddl_is_applied()
+given_the_table_exists("events")
+given_the_table_exists("trace_state")
+given_the_endpoint_exists("POST /api/events")
+given_an_existing_trace("trace-123")
+responses = when_two_events_are_posted_at_the_same_time_for("trace-123")
+then_both_events_were_stored()
+then_the_snapshot_reflects_the_newest_one()
+
+
+# ============================================================
+# BLOCK 3 — Hurl, end to end against the public API
+# ============================================================
+
+
+# [H1] dep: 6.1
+given_the_ddl_is_applied()
+given_the_table_exists("events")
+given_the_table_exists("trace_state")
+given_the_endpoint_exists("POST /api/events")
+given_the_endpoint_exists("GET /api/traces/{traceId}/status")
+given_the_app_is_running()
+when_an_event_is_posted(trace_id = "hurl-started", promises_nothing = true, final = false)
+status = when_the_trace_status_is_requested("hurl-started")
+then_the_status_is(STARTED)
+
+
+# [H2] dep: 6.2 — a huge TTL on purpose, so it does not expire mid test
+given_the_ddl_is_applied()
+given_the_table_exists("events")
+given_the_table_exists("trace_state")
+given_the_endpoint_exists("POST /api/events")
+given_the_endpoint_exists("GET /api/traces/{traceId}/status")
+given_the_app_is_running()
+when_an_event_is_posted(trace_id = "hurl-waiting", promises = "RULES_EVALUATED", ttl_seconds = 999999)
+status = when_the_trace_status_is_requested("hurl-waiting")
+then_the_status_is(WAITING_OTHER_EVENT)
+
+
+# [H3] dep: 6.3 — it does NOT sleep the thread. The deadline was gone on arrival.
+given_the_ddl_is_applied()
+given_the_table_exists("events")
+given_the_table_exists("trace_state")
+given_the_endpoint_exists("POST /api/events")
+given_the_endpoint_exists("GET /api/traces/{traceId}/status")
+given_the_app_is_running()
+when_an_event_is_posted(trace_id = "hurl-expired", occurred_at = "2020-01-01T00:00:00Z", promises = "RULES_EVALUATED", ttl_seconds = 60)
+status = when_the_trace_status_is_requested("hurl-expired")
+then_the_status_is(TTL_EXPIRED_FOR_EVENT)
+
+
+# [H4] dep: 6.4
+given_the_ddl_is_applied()
+given_the_table_exists("events")
+given_the_table_exists("trace_state")
+given_the_endpoint_exists("POST /api/events")
+given_the_endpoint_exists("GET /api/traces/{traceId}/status")
+given_the_app_is_running()
+when_an_event_is_posted(trace_id = "hurl-completed", final = true)
+status = when_the_trace_status_is_requested("hurl-completed")
+then_the_status_is(COMPLETED)
+
+
+# [H5] dep: 4.3, 6.5 — a traceId that was never sent
+given_the_ddl_is_applied()
+given_the_table_exists("events")
+given_the_table_exists("trace_state")
+given_the_endpoint_exists("GET /api/traces/{traceId}/status")
+given_the_app_is_running()
+response = when_the_trace_status_is_requested("trace-999")
+then_the_response_status_is(404)
+then_the_response_body_mentions("trace-999")
+
+
+# [dep: 4.2] — the full response contract
+given_the_ddl_is_applied()
+given_the_table_exists("events")
+given_the_table_exists("trace_state")
+given_the_endpoint_exists("POST /api/events")
+given_the_endpoint_exists("GET /api/traces/{traceId}/status")
+given_the_app_is_running()
+when_an_event_is_posted(trace_id = "hurl-contract", promises = "RULES_EVALUATED", ttl_seconds = 999999)
+response = when_the_trace_status_is_requested("hurl-contract")
+then_the_response_has_fields(traceId, status, lastEventName, lastEventResult, nextExpectedEvent, nextExpectedBefore, eventsReceived)
