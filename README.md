@@ -160,19 +160,38 @@ We did not decide anything new here. We only read the flags they send us, which 
 
 8. What do we do with the extra data they may attach?
 
-**[Approach for this MVP]** 
+**[Approach for this MVP]**
 
-**[The trade-off]** 
+- We store `metadata` as JSONB.
+- We never look inside it. Nothing in there decides a status.
+- They proposed this field (I mean, from the story I wrote at the begining haha) for requirements we do not know about yet. So we keep it and we do not touch it.
+
+**[The trade-off]**
+
+- Nobody can query by what is inside.
+- And we validate nothing. If a team sends us garbage in there, we keep the garbage.
 
 9. How do we keep our own snapshot from lying to us?
 
-**[Approach for this MVP]** 
+**[Approach for this MVP]** Three things.
 
-**[The trade-off]** 
+- One transaction per event. The event row and the snapshot are written together, or neither one is written. If we saved the event and the snapshot write failed, we would be keeping a fact that our own summary does not know about, and nobody would ever tell us.
+- A lock on the trace row (SELECT FOR UPDATE). Two events of the same trace can arrive at the same time. Without the lock both would read the same snapshot, both would write on top of it, and one of the two would just disappear. With it, the second one waits for the first to finish.
+- And no `status` column. Sounds like irony but it is not: we do not store the status, so it cannot go out of date.
+
+**[The trade-off]**
+
+- Events of the same trace are handled one by one, so if many events arrive for the same artifact (trace_id) they take longer; only for that trace id, though. One trace never blocks another.
 
 10. What do we answer when someone asks for a **trace_id** we have never seen?
 
-**[Approach for this MVP]** 
+**[Approach for this MVP]** Simple, 404.
 
-**[The trade-off]** 
+- We are not going to invent a status for a flow nobody ever told us about.
+- STARTED would be a lie. 
+- And 200 with an empty body? That is confusing, at least.
+
+**[The trade-off]**
+
+- Maybe that trace will exist in a second, and we just have not received its first event yet. Both cases are 404. 
 
