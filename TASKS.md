@@ -79,17 +79,18 @@ Each one is a branch in the ingest path, in this order.
 
 ## 6. Hurl
 
-- [ ] **6.1** `started-flow.hurl` `[H1]`
-- [ ] **6.2** `waiting-other-event-flow.hurl` `[H2]`
-- [ ] **6.3** `ttl-expired-flow.hurl`, using an `occurredAt` far in the past instead of sleeping the thread. `[H3]`
-- [ ] **6.4** `completed-flow.hurl` `[H4]`
-- [ ] **6.5** `trace-not-found.hurl` `[H5]`
-- [ ] **6.6** Run all of them together and make sure the traceIds do not collide.
+- [x] **6.1** `started-flow.hurl` `[H1]`
+- [x] **6.2** `waiting-other-event-flow.hurl` `[H2]`
+- [x] **6.3** `ttl-expired-flow.hurl`, using an `occurredAt` far in the past instead of sleeping the thread. `[H3]`
+- [x] **6.4** `completed-flow.hurl` `[H4]`
+- [x] **6.5** `trace-not-found.hurl` `[H5]`
+- [x] **6.6** Run all of them together and make sure the traceIds do not collide. `hurl --test hurl/*.hurl`, 5 of 5.
+- [ ] **6.7** The files use a fixed `traceId` and expect 201. Once 5.1 and 5.2 land, a second run answers 200 and they turn red. Fix: have the `POST` return the `traceId` so the files can chain fresh ids.
 
 ## 7. Documentation
 
-- [ ] **7.1** How to run the project, including the Java 21 requirement and the `/api` prefix.
-- [ ] **7.2** How to run the Hurl tests.
-- [ ] **7.3** Assumptions.
+- [x] **7.1** How to run the project, including the Java 21 requirement and the `/api` prefix.
+- [x] **7.2** How to run the Hurl tests.
+- [x] **7.3** Assumptions.
 - [x] **7.4** `AI_USAGE.md`.
 - [ ] **7.5** A pass for typos over the whole README.

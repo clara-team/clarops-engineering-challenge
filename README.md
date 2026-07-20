@@ -356,3 +356,71 @@ And a `traceId` we have never seen. **[H5]**
 ```
 
 with a 404, because we are not going to make up a status for a flow nobody told us about.
+
+## 5. Assumptions
+
+Things we took for granted. If one of them is false, some decisions change.
+
+1. **Their clocks are right.** We judge everything with `occurredAt`, so we need their clocks to be roughly correct. More about this in group B.
+2. **This is an MVP.** One instance, one database. The events table only grows and nobody cleans it.
+3. **Nobody reads `metadata`.** We store it and that is it.
+4. **They retry.** That is why `eventId` exists, and why duplicates are normal traffic and not a bug.
+5. **Somebody asks.** Nobody has to be notified when a flow expires. A consumer calls the status endpoint. This is the assumption that lets us calculate the status instead of storing it.
+
+## 6. How to run it
+
+You need Java 21 and Docker running.
+
+```bash
+sdk env                            # the repo has a .sdkmanrc
+cp docker/example.env docker/.env  # the defaults already match application.yaml
+./mvnw spring-boot:run
+```
+
+Spring starts Postgres by itself, so there is no `docker compose up` to run.
+
+Check it is alive:
+
+```bash
+curl http://localhost:8080/api/health
+# clarops sr engineer challenge
+```
+
+Two things that will bite you:
+
+1. The context path is `/api`. The real endpoints are `/api/events` and `/api/traces/{traceId}/status`. The challenge writes them without the prefix.
+2. The SQL init scripts only run on a NEW database. If you change the DDL, wipe the volume first:
+
+```bash
+cd docker && docker compose down -v && docker compose up -d
+```
+
+That `-v` is the important part. Without it you will think your DDL is broken, and it is not.
+
+## 7. How to run the Hurl tests
+
+Install Hurl, start the app, and in another terminal:
+
+```bash
+hurl --test hurl/*.hurl
+```
+
+They only talk to the public API, never to the database. One file per status:
+
+| File | What it proves |
+|---|---|
+| `hurl/started-flow.hurl` | a trace reaches `STARTED` |
+| `hurl/waiting-other-event-flow.hurl` | a trace reaches `WAITING_OTHER_EVENT` |
+| `hurl/ttl-expired-flow.hurl` | a trace reaches `TTL_EXPIRED_FOR_EVENT` |
+| `hurl/completed-flow.hurl` | a trace reaches `COMPLETED` |
+| `hurl/trace-not-found.hurl` | an unknown `traceId` answers 404 |
+
+The expired one does not sleep. It sends an `occurredAt` far in the past, so the deadline is already gone by the time we ask. That works because we count the TTL from `occurredAt` (group B).
+
+### A note on where we test
+
+We test from the endpoint whenever we can. `src/test/java/com/clara/challenge/trace/TraceStateTest.java` posts a real event and asks for the status against a real Postgres, and the only thing we fake is the clock. A test that crosses the controller, the transaction and the database is the one that fails when any of them break. Calling `TraceState.statusAt()` on its own would stay green while the endpoint returns 404.
+
+The exceptions are the clock edges, cheaper as plain unit tests on `TraceState`, with no Spring and no Docker.
+
+And these Hurl files are not a separate idea. They come from `unit_tests.gwt`, block 3, same as the Java tests. Same source, two audiences.

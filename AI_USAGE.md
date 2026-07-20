@@ -53,3 +53,12 @@ This is important. We already had:
 5. So, I prompted a SKILL.md that implements from pseudocode. It takes GWT agnostic code and implemented java code from it. More about this in TASKS.md 
 6. I persisted the first execution of the SKILL. It was successful. FIRST_SKILL_EXECUTION.md
 7. I also persisted the prompt to create the SKILL. PROMPT_TO_CREATE_SKILL.md
+
+## The code
+
+Same pattern once we started writing Java, with one difference: the skill I built for it is told to ask before assuming, and it did.
+
+- I asked it to assert the status "in the `trace_snapshot` table". It stopped and pointed out that the whole design says the status is never stored. It was right and I rewrote the given/when/then.
+
+
+The Hurl files came from `unit_tests.gwt`, block 3, the same document the Java tests came from. I described the scenarios once and used them twice.
