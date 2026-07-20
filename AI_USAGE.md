@@ -62,3 +62,9 @@ Same pattern once we started writing Java, with one difference: the skill I buil
 
 
 The Hurl files came from `unit_tests.gwt`, block 3, the same document the Java tests came from. I described the scenarios once and used them twice.
+
+## Testing through the endpoint
+
+One decision worth naming: every test goes through the public endpoints, not against the classes. The AI argued for keeping a couple of pure unit tests, because the challenge asks for unit tests and because the clock edges are cheaper without Spring. I decided against it and asked for everything to go through HTTP. A green test should mean the whole chain works, not that one method returns the right enum.
+
+The last thing it removed on my request was a repository call inside a `given_`. The test now reads the deadline from the `GET` response instead of from the database, so `TraceStateRepository` is gone from the test class entirely.

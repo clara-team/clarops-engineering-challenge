@@ -49,17 +49,18 @@ The list below is the second half of the work. This is the first half, and I am 
 
 ## 3. Calculating the status
 
-This is the core, and it is a pure class. No Spring, no database, an injected `Clock`.
+This is the core. We test all of it through the endpoints, not against the class, so that a green test means the whole chain works and not just the calculation. The clock is the only thing we control from the test.
 
-- [ ] **3.1** A domain class that takes the trace snapshot plus a `Clock` and returns one of the four statuses.
-- [ ] **3.2** Compare in this order: COMPLETED, then TTL, then WAITING, then STARTED. Checking TTL first would report a closed flow as expired. `[T5]`
+- [x] **3.1** A `statusAt(Instant)` on `TraceState` that returns one of the four statuses. It ended up living on the JPA entity instead of on a separate pure class, which is the first thing a refactor would split.
+- [x] **3.2** Compare in this order: COMPLETED, then TTL, then WAITING, then STARTED. Checking TTL first would report a closed flow as expired. `[T5]`
 - [x] **3.3** Promise alive and the clock is before the deadline. `[T1]`
-- [ ] **3.4** Same snapshot, clock moved past the deadline. Nothing was written and the answer changed. `[T2]` **← NEXT (3)** the logic is already written and the infrastructure is up, so this one is almost free. It is the test that proves the whole idea.
-- [ ] **3.5** Exactly at the deadline the trace is still waiting. Expired only after. `[T3]`
-- [ ] **3.6** First event carries `finalEvent`. `[T4]`
-- [ ] **3.7** `result` never decides the status. `[T6]` `[T7]`
-- [ ] **3.8** A promise without a TTL is not a promise. `[T8]`
-- [ ] **3.9** The late event arrives after expiry and the flow moves on. `[T9]`
+- [x] **3.4** Same snapshot, clock moved past the deadline. Nothing was written and the answer changed. `[T2]`
+- [x] **3.5** Exactly at the deadline the trace is still waiting. Expired only after. `[T3]`
+- [x] **3.6** First event carries `finalEvent`. `[T4]`
+- [x] **3.7** `result` never decides the status. `[T7]`
+- [ ] **3.10** `[T6]` is only half proven: the COMPLETED test builds a trace whose last result is ERROR, but it never asserts that the response carries that ERROR back.
+- [x] **3.8** A promise without a TTL is not a promise. `[T8]`
+- [x] **3.9** The late event arrives after expiry and the flow moves on. `[T9]`
 
 ## 4. Reading the status
 
