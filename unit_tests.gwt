@@ -19,12 +19,21 @@
 
 
 # [T1] dep: 3.1 — live promise, the clock has not crossed the deadline
-given_the_domain_type_exists("TraceSnapshot")
-given_a_trace_whose_last_event_promised("RULES_EVALUATED")
-given_the_deadline_is("2026-06-15T10:02:00Z")
-status = when_the_status_is_asked_at("2026-06-15T10:01:00Z")
-then_the_status_is(WAITING_OTHER_EVENT)
-
+given_the_ddl_is_applied()
+given_the_table_exists("events")
+given_the_table_exists("trace_state")
+given_the_endpoint_exists("POST /api/events")
+given_the_endpoint_exists("GET /api/traces/{traceId}/status")
+given_the_clock_is_fixed_at("2026-06-15T10:01:00Z")
+trace_id = given_a_trace_whose_last_event_promised(
+    event_id    = "evt-001",
+    event_name  = "APPLICATION_RECEIVED",
+    result      = "SUCCESS",
+    occurred_at = "2026-06-15T10:00:00Z",
+    promises    = "RULES_EVALUATED",
+    ttl_seconds = 120)
+status = when_the_status_is_asked_via_get_endpoint("GET", f"/api/traces/{trace_id}/status")
+then_the_status_trace_id_is(trace_id, WAITING_OTHER_EVENT)
 
 # [T2] dep: 3.1 — SAME snapshot as T1, only the clock changed.
 # Nobody wrote anything and the answer changed. This is the test of the project.
