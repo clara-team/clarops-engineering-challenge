@@ -2,6 +2,8 @@
 
 > I moved the challenge content here: [CHALLENGE.md](./CHALLENGE.md)
 
+NOTE: You'll see that I use "we" a lot, because I'm describing the problem as if we were in a team working with others to pull this out; as I describe in my story at the begining. It is not the LLM and me talking (is it? haha; no it is NOT.).
+
 ## 1. Problem understanding
 
 Let me explain. I'll invent a small story to demonstrate that I understood the problem and also to start mentioning some of the desicions I made.
@@ -227,3 +229,128 @@ We'll build only what the problem needs now. Everything here is something we cou
 12. **More than one promise at a time.** One more thing we did not build, but we know where it would go. What if a step promises two events at the same time? For example, a payment that has to be approved by risk AND by compliance, and we have to wait for both. Today our snapshot only accept "serial" promises per trace, so we could not do it. We would need a table with all the promises that are still open, and the status would look at all of them together. 
 
 13. **A dashboard of expired traces.** Sooner or later somebody will want to see all of them on one screen. Today they would have to ask trace by trace, because there is no `status` column to filter on. It is doable: a partial index (`WHERE completed_at IS NULL`) over the traces that are still open, and the deadline comparison on top of that. We would change our mind the day somebody has to WATCH the flows, and not just ask about one.
+
+## 4. The two endpoints
+
+Two things. 
+1. They (the senders man) send us events, 
+2. and somebody asks how a flow is going. 
+
+That is the whole API.
+
+### They send us an event
+
+```
+POST /api/events
+```
+
+The body is the one they agreed to send us in that meeting (my story, yep). Five fields are required (`eventId`, `traceId`, `eventName`, `result`, `occurredAt`) and four are optional.
+
+```json
+{
+  "eventId": "evt-001",
+  "traceId": "trace-123",
+  "eventName": "APPLICATION_RECEIVED",
+  "result": "SUCCESS",
+  "occurredAt": "2026-06-15T10:00:00Z",
+  "nextExpectedEvent": "RULES_EVALUATED",
+  "nextEventTtlSeconds": 120,
+  "finalEvent": false,
+  "metadata": { "country": "MX", "entityId": "company-123" }
+}
+```
+
+What we answer is not in the contract, it is what we decided in section 2. So here it is in one place:
+
+| What arrived | We answer | Do we keep it? | Does the snapshot move? |
+|---|---|---|---|
+| A normal event | 201 | yes | yes |
+| An `eventId` we already have | 200 | no | no |
+| Anything, but the trace is already COMPLETED | 200 | yes | no |
+| An event older than the last one we stored | 200 | yes | no |
+| An event that arrives after the TTL was over | 201 | yes | yes |
+| An `eventName` we were not expecting | 409 | yes | no |
+| A body missing a required field, or a `result` that is not SUCCESS or ERROR | 400 | no | no |
+
+### Somebody asks how a flow is going
+
+```
+GET /api/traces/{traceId}/status
+```
+
+They never told us what to answer here, so we just shared our Swagger with them. These are the fields and why each one is there:
+
+- `traceId`, so the answer says what it is about.
+- `status`, the whole point.
+- `lastEventName` and `lastEventResult`, because a step can fail and the flow can still be fine. Whoever asks should see both.
+- `nextExpectedEvent` and `nextExpectedBefore`, the promise we are waiting on. They send us seconds (`nextEventTtlSeconds`) and WE turn it into a date.
+- `eventsReceived`, so you can tell a fresh trace from a busy one.
+
+And we keep `nextExpectedBefore` in the answer even when the trace is already expired. It is a fact, we stored it. It is also what makes the answer readable: you see the status AND the deadline it was judged against.
+
+A trace that just started and promised nothing:
+
+```json
+{
+  "traceId": "trace-123",
+  "status": "STARTED",
+  "lastEventName": "APPLICATION_RECEIVED",
+  "lastEventResult": "SUCCESS",
+  "nextExpectedEvent": null,
+  "nextExpectedBefore": null,
+  "eventsReceived": 1
+}
+```
+
+A trace waiting for something, still on time:
+
+```json
+{
+  "traceId": "trace-124",
+  "status": "WAITING_OTHER_EVENT",
+  "lastEventName": "APPLICATION_RECEIVED",
+  "lastEventResult": "SUCCESS",
+  "nextExpectedEvent": "RULES_EVALUATED",
+  "nextExpectedBefore": "2026-06-15T10:02:00Z",
+  "eventsReceived": 1
+}
+```
+
+The same trace, asked two minutes later. Nothing arrived, nobody did anything, and the answer changed by itself:
+
+```json
+{
+  "traceId": "trace-124",
+  "status": "TTL_EXPIRED_FOR_EVENT",
+  "lastEventName": "APPLICATION_RECEIVED",
+  "lastEventResult": "SUCCESS",
+  "nextExpectedEvent": "RULES_EVALUATED",
+  "nextExpectedBefore": "2026-06-15T10:02:00Z",
+  "eventsReceived": 1
+}
+```
+
+A flow that finished, and finished badly. Look at `status` and `lastEventResult` together, they are not the same thing:
+
+```json
+{
+  "traceId": "trace-125",
+  "status": "COMPLETED",
+  "lastEventName": "APPLICATION_REJECTED",
+  "lastEventResult": "ERROR",
+  "nextExpectedEvent": null,
+  "nextExpectedBefore": null,
+  "eventsReceived": 4
+}
+```
+
+And a `traceId` we have never seen:
+
+```json
+{
+  "error": "trace not found",
+  "traceId": "trace-999"
+}
+```
+
+with a 404, because we are not going to make up a status for a flow nobody told us about.
