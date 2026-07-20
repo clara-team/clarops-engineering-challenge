@@ -62,7 +62,7 @@ And the main decision: we do not save the status. We calculate it when someone a
 
 These are the questions we did NOT answer that day. They are not 13 separate decisions: once we started answering them we saw that many of them were the same decision looked at from a different angle, so we grouped them. For each group: what could be going on, what we do for this MVP, and the trade-off.
 
-Three of these questions were not on the list. Nobody asked them in that meeting, we found them later, on our own they are marked.
+Three of these questions were not on the list. Nobody asked them in that meeting, we found them later, on our own. They are marked.
 
 ### A. When a strange event arrives
 
@@ -100,7 +100,7 @@ So we will:
 5. If the `eventName` is not the one we were told to expect, we keep it and answer 409. They told us to wait for X and Y arrived. So officially, this IS a conflict. We want to see those 409 and find out what the sender was attempting. And the snapshot does not move.
 
 **[The trade-off]** 
-- The MAIN one: our status can change. Today we say expired. Tomorrow the late event arrives and we say waiting. So if you ask twice, you get two answers. We take that. Saying a flow is dead when it was only slow is worse.
+- The MAIN one: our status can change. Today we say expired. Tomorrow the late event arrives and we say waiting, we'll bring the flow back. So if you ask twice, you could get two answers. We take that. Saying a flow is dead when it was only slow is worse (unless we receive NEW INFORMATION that makes us change our opinion).
 - We drop duplicates. So if somebody reuses an eventId for a different event, that event is lost. The weekly log is our only safety net.
 - Kafka sends events out of order. And we answer 409 when the name is not the one we expected. So a 409 will not always mean somebody did something wrong.
 - If a team marks finalEvent by mistake, that flow is closed forever. And it looks the same as a flow that really ended.
@@ -111,11 +111,25 @@ So we will:
 4. What is the most important clock? theirs (**occurredAt**) or ours (when the event arrived to us)?
 13. Do we trust their clock even when it is clearly wrong? (we found this one later)
 
-**[What could be going on?]** 
+**[What could be going on?]** Two clocks are involved here, and they will not agree.
 
-**[Approach for this MVP]** 
+- Their clock says when the event happened. Our clock says when we found out.
+- The network is in the middle. A slow sender, a retry, a queue, a mountain, a dead battery, and the two times will disagree.
+- And somebody's server can simply have the wrong hour. Nobody notices a wrong clock until something depends on it. We are the ones who depend on it.
 
-**[The trade-off]** 
+**[Approach for this MVP]** We count the TTL from `occurredAt`. Sendr's clock wins.
+
+- Expired is a fact for everyone. The deadline is `occurredAt + nextEventTtlSeconds`. Anybody looking at it gets the same answer. If we judged it with our own arrival time, the deadline would be local to us, and we would be comparing apples to oranges.
+- And if our service goes down for an hour, everything arrives at once when it comes back. If we use our clock, all events arriving would look fresh, and we would be extending everybody's deadline because WE were down. With `occurredAt` the ones that are expired are shown as expired, which is the truth.And it holds up group A. A late event brings a flow back, so if the deadline came from our arrival time, the same events would give different answers on different days. With occurredAt the past does not move.
+- And the answers in group A depend on this. When a flow comes back, it does not come back alone. It comes back with a new promise. And that new promise needs a deadline. If we started counting when it arrived to us, the deadline would be ours. Not theirs.
+- We store `received_at` too. We will not use it for the verdict, but we want to see the gap. If `occurredAt` lands in the future, or the gap is absurd, we log it. Same idea as the weekly duplicate check.
+- Somebody could put something like `signal_recovered_at` inside `metadata`. That is fine, it is a field that we could use in the future to try to infer more about timing between events.
+
+**[The trade-off]**
+
+- The worst one, and it is real. Our snapshot moves forward by occurredAt. So a sender whose clock is an hour ahead FREEZES that trace for an hour. Nothing moves it, from anybody. A possible fix: ignore an occurredAt that is minutes ahead of our now(). It only catches the gross ones. We will not build it for this MVP.
+- And a clock running behind does the opposite. Its deadline already passed when the event arrives, so we call the flow expired, but it just started.
+- The `received_at` column is what would let us catch all of this. It is not a fix. It is a way to find out.
 
 ### C. How we read what an event promises
 
@@ -123,11 +137,11 @@ So we will:
 7. If a step failed (**ERROR**) but still promises a next event, do we keep waiting?
 11. What if they promise a next event but they do not say for how long? (we found this one later)
 
-**[What could be going on?]** 
+**[What could be going on?]**
 
-**[Approach for this MVP]** 
+**[Approach for this MVP]**
 
-**[The trade-off]** 
+**[The trade-off]**
 
 ### D. The loose ones
 
@@ -135,7 +149,7 @@ So we will:
 
 **[Approach for this MVP]** 
 
-**[The trade-off]**
+**[The trade-off]** 
 
 9. How do we keep our own snapshot from lying to us?
 
