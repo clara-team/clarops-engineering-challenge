@@ -41,3 +41,15 @@ Worth listing, because it is the part that says I was reading and arguing, and n
 - Deciding. Every decision in section 2 of the README is mine, including the ones where I went against the suggestion.
 - Writting justification for technical decisions and "Trade-offs and what we left out" is mine. Except for the things where I asked for a simpler version of what I've written.
 - The story in section 1. That one is mine, typos and all.
+
+## My time was little, so I created a SKILL
+
+This is important. We already had:
+1. Defined the business in README.md 
+2. Mapped the tests in TASKS.md 
+3. Tagged the tests inside the README.md for more LLM context. 
+4. From #2 and #3 generated a set of given,when,then tests. Agnostic from programming language.
+    - unit_tests.gwt
+5. So, I prompted a SKILL.md that implements from pseudocode. It takes GWT agnostic code and implemented java code from it. More about this in TASKS.md 
+6. I persisted the first execution of the SKILL. It was successful. FIRST_SKILL_EXECUTION.md
+7. I also persisted the prompt to create the SKILL. PROMPT_TO_CREATE_SKILL.md

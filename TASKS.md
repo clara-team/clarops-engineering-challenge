@@ -29,6 +29,7 @@ The list below is the second half of the work. This is the first half, and I am 
 
 **Improving tests descriptions.** Now that the tests I wanted have an indentifier and that the AI has found the corresponding rules in the README.md and tagged them, I asked it to improve the description of my tests and among other things it gave me these awesome tables. 
 
+**Requesting a skill that implements from pseudocode.** Since the time was very little I created a skill that implemented java code from pseudocode in GWT form. More about this in AI_USAGE.md 
 
 ---
 
