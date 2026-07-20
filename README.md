@@ -92,14 +92,14 @@ Three of these questions were not on the list. Nobody asked them in that meeting
 
 Now almost everything gets stored because they are facts, we'll deal with specific exceptions in other iterations, when we HAVE MORE INFO. But we need to know when we allow to update the snapshot (the trace state).
 
-A normal event is persisted and updates the snapshot, returning 201. Dealing with special cases has to have an order because these cases overlap. The same event can be old, late and unexpected at the same time, so what we look at first is what decides the answer. We already learned this when we defined the four statuses: checking TTL before completion would report a closed flow as expired.
+A normal event is persisted and updates the snapshot, returning 201. Dealing with special cases has to have an order because these cases overlap. The same event can be old, late and unexpected at the same time, so what we look at first is what decides the answer. We already learned this when we defined the four statuses: checking TTL before completion would report a closed flow as expired. **[T5]**
 
 So we will:
-1. Since for the moment, looks that the risk is low, we'll return OK (200) to duplicates, but we will not be saving duplicates, and also we'll not let duplicates update our databae.
-2. If the trace is already COMPLETED, we keep the event and answer 200. But the snapshot does not move. A closed flow stays closed.
-3. If the event is older than the last one we stored, we keep it and answer 200. But it does not move the snapshot. It happened, it is just not the newest thing that happened.
-4. If he TTL was already over, we keep it and we DO let it move the snapshot. The flow comes back to life. We are not going to chase every employee working where the internet signal is bad. And the log will tell us who they are anyway.
-5. If the `eventName` is not the one we were told to expect, we keep it and answer 409. They told us to wait for X and Y arrived. So officially, this IS a conflict. We want to see those 409 and find out what the sender was attempting. And the snapshot does not move.
+1. Since for the moment, looks that the risk is low, we'll return OK (200) to duplicates, but we will not be saving duplicates, and also we'll not let duplicates update our databae. **[I1]**
+2. If the trace is already COMPLETED, we keep the event and answer 200. But the snapshot does not move. A closed flow stays closed. **[I2]**
+3. If the event is older than the last one we stored, we keep it and answer 200. But it does not move the snapshot. It happened, it is just not the newest thing that happened. **[I3]**
+4. If he TTL was already over, we keep it and we DO let it move the snapshot. The flow comes back to life. We are not going to chase every employee working where the internet signal is bad. And the log will tell us who they are anyway. **[T9]**
+5. If the `eventName` is not the one we were told to expect, we keep it and answer 409. They told us to wait for X and Y arrived. So officially, this IS a conflict. We want to see those 409 and find out what the sender was attempting. And the snapshot does not move. **[I4]**
 
 **[The trade-off]** 
 - The MAIN one: our status can change. Today we say expired. Tomorrow the late event arrives and we say waiting, we'll bring the flow back. So if you ask twice, you could get two answers. We take that. Saying a flow is dead when it was only slow is worse (unless we receive NEW INFORMATION that makes us change our opinion).
@@ -147,9 +147,9 @@ So we will:
 
 **[Approach for this MVP]** We only read the structural flags. That is `finalEvent`, and the pair `nextExpectedEvent` + `nextEventTtlSeconds`. Nothing else decides the status.
 
-- If the very first event says `finalEvent`, the flow is COMPLETED. We do not need a second one.
-- `result` decides nothing. It talks about the step. The status talks about the flow. So an ERROR that promises a next event keeps waiting, and a flow can be COMPLETED with `result` ERROR. Two different things.
-- A promise that is not correctly filled is not a promise. Without `nextEventTtlSeconds` there is no deadline, and without a deadline there is nothing to expire. So the trace status will be STARTED, not WAITING. We are not going to say we are waiting for something that can never expire, and we are not going to call it COMPLETED either, because nobody told us it was the last one. If another event arrives with an actual promise, the flow starts waiting again. Rejecting it would mean rejecting that whole team.
+- If the very first event says `finalEvent`, the flow is COMPLETED. We do not need a second one. **[T4]**
+- `result` decides nothing. It talks about the step. The status talks about the flow. So an ERROR that promises a next event keeps waiting **[T7]**, and a flow can be COMPLETED with `result` ERROR **[T6]**. Two different things.
+- A promise that is not correctly filled is not a promise. Without `nextEventTtlSeconds` there is no deadline, and without a deadline there is nothing to expire. So the trace status will be STARTED, not WAITING. We are not going to say we are waiting for something that can never expire, and we are not going to call it COMPLETED either, because nobody told us it was the last one. If another event arrives with an actual promise, the flow starts waiting again. Rejecting it would mean rejecting that whole team. **[T8]**
 
 We did not decide anything new here. We only read the flags they send us, which is what we agreed in that meeting, and these three questions answer themselves.
 
@@ -187,7 +187,7 @@ We did not decide anything new here. We only read the flags they send us, which 
 
 10. What do we answer when someone asks for a **trace_id** we have never seen?
 
-**[Approach for this MVP]** Simple, 404.
+**[Approach for this MVP]** Simple, 404. **[H5]**
 
 - We are not going to invent a status for a flow nobody ever told us about.
 - STARTED would be a lie. 
@@ -264,12 +264,12 @@ What we answer is not in the contract, it is what we decided in section 2. So he
 
 | What arrived | We answer | Do we keep it? | Does the snapshot move? |
 |---|---|---|---|
-| A normal event | 201 | yes | yes |
-| An `eventId` we already have | 200 | no | no |
-| Anything, but the trace is already COMPLETED | 200 | yes | no |
-| An event older than the last one we stored | 200 | yes | no |
-| An event that arrives after the TTL was over | 201 | yes | yes |
-| An `eventName` we were not expecting | 409 | yes | no |
+| A normal event | 201 | yes | yes | 
+| An `eventId` we already have **[I1]** | 200 | no | no |
+| Anything, but the trace is already COMPLETED **[I2]** | 200 | yes | no |
+| An event older than the last one we stored **[I3]** | 200 | yes | no |
+| An event that arrives after the TTL was over **[T9]** | 201 | yes | yes |
+| An `eventName` we were not expecting **[I4]** | 409 | yes | no |
 | A body missing a required field, or a `result` that is not SUCCESS or ERROR | 400 | no | no |
 
 ### Somebody asks how a flow is going
@@ -286,9 +286,11 @@ They never told us what to answer here, so we just shared our Swagger with them.
 - `nextExpectedEvent` and `nextExpectedBefore`, the promise we are waiting on. They send us seconds (`nextEventTtlSeconds`) and WE turn it into a date.
 - `eventsReceived`, so you can tell a fresh trace from a busy one.
 
+And one small thing that somebody will ask sooner or later: at exactly `nextExpectedBefore`, the trace is still WAITING. The promise was "within 120 seconds", so the second number 120 still counts. We only call it expired after that. **[T3]**
+
 And we keep `nextExpectedBefore` in the answer even when the trace is already expired. It is a fact, we stored it. It is also what makes the answer readable: you see the status AND the deadline it was judged against.
 
-A trace that just started and promised nothing:
+A trace that just started and promised nothing. **[H1]**
 
 ```json
 {
@@ -302,7 +304,7 @@ A trace that just started and promised nothing:
 }
 ```
 
-A trace waiting for something, still on time:
+A trace waiting for something, still on time. **[H2]** **[T1]**
 
 ```json
 {
@@ -316,7 +318,7 @@ A trace waiting for something, still on time:
 }
 ```
 
-The same trace, asked two minutes later. Nothing arrived, nobody did anything, and the answer changed by itself:
+The same trace, asked two minutes later. Nothing arrived, nobody did anything, and the answer changed by itself. This one is the whole idea of the project in one example, so it gets its own test twice. **[H3]** **[T2]**
 
 ```json
 {
@@ -330,7 +332,7 @@ The same trace, asked two minutes later. Nothing arrived, nobody did anything, a
 }
 ```
 
-A flow that finished, and finished badly. Look at `status` and `lastEventResult` together, they are not the same thing:
+A flow that finished, and finished badly. Look at `status` and `lastEventResult` together, they are not the same thing. **[H4]** **[T6]**
 
 ```json
 {
@@ -344,7 +346,7 @@ A flow that finished, and finished badly. Look at `status` and `lastEventResult`
 }
 ```
 
-And a `traceId` we have never seen:
+And a `traceId` we have never seen. **[H5]**
 
 ```json
 {
