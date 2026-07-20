@@ -1,0 +1,27 @@
+erDiagram
+    TRACES ||--o{ EVENTS : "contains"
+
+    TRACES {
+        VARCHAR trace_id PK "Unique identifier of the distributed flow"
+        VARCHAR status "STARTED | WAITING_OTHER_EVENT | TTL_EXPIRED_FOR_EVENT | COMPLETED"
+        VARCHAR last_event_name "Name of the last processed event"
+        VARCHAR last_event_result "SUCCESS | ERROR"
+        VARCHAR next_expected_event "Name of the next expected event (optional)"
+        TIMESTAMPTZ next_expected_before "Absolute expiration timestamp calculated via TTL"
+        INTEGER events_count "Total count of events received for this trace"
+        TIMESTAMPTZ created_at "Creation timestamp of the trace"
+        TIMESTAMPTZ updated_at "Last modification timestamp"
+    }
+
+    EVENTS {
+        VARCHAR event_id PK "Unique immutable event identifier"
+        VARCHAR trace_id FK "Reference to parent trace"
+        VARCHAR event_name "Name of the received event"
+        VARCHAR result "Event outcome: SUCCESS | ERROR"
+        TIMESTAMPTZ occurred_at "Timestamp provided by the origin system"
+        TIMESTAMPTZ received_at "Timestamp when received by our server"
+        VARCHAR next_expected_event "Next expected event name from this payload (optional)"
+        INTEGER next_event_ttl_seconds "TTL in seconds from this payload (optional)"
+        BOOLEAN final_event "Flag indicating if this event completes the flow"
+        JSONB metadata "Flexible JSON metadata payload"
+    }

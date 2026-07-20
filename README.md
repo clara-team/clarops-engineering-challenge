@@ -701,3 +701,242 @@ The goal is to evaluate how the candidate works with AI-generated code, how they
 Keep the solution simple.
 
 We are not looking for a perfect event-driven platform. We are looking for a small and thoughtful implementation that shows how you reason about distributed events, TTL expiration, ambiguous requirements, database modeling, AI-assisted development, task decomposition, and testing standards.
+
+---
+
+# Architecture
+
+## Data Model
+
+**Dual-storage strategy:**
+
+- **`traces` table** — consolidated, current state of each distributed flow. Fast reads for status
+  checks without recalculating from the full event history.
+- **`events` table** — immutable append-only event log for audit, idempotency, and history.
+
+### Storage & state management
+
+All state lives in PostgreSQL. No in-memory caches, no background schedulers (`@Scheduled`),
+no distributed locks, and no external brokers.
+
+### TTL calculation
+
+```
+next_expected_before = received_at + nextEventTtlSeconds
+```
+
+Server `received_at` is used instead of client-supplied `occurredAt` to avoid clock-skew issues.
+
+### Metadata
+
+Stored as `JSONB`. Serialized at the application layer via Jackson 3.x
+(`tools.jackson.databind.ObjectMapper`) and persisted through Hibernate's
+`@ColumnTransformer(write = "?::jsonb")`.
+
+### Idempotency
+
+Duplicates are detected via `EventRepository.existsById(eventId)` **before** any trace mutation.
+`EventEntity` implements `Persistable<String>` with `isNew() = true` to force `persist()`
+semantics and prevent Hibernate from silently overwriting existing events via `merge()`.
+
+---
+
+## Package Layout
+
+```
+com.clara.challenge
+  controller/       EventController, TraceController
+  dto/              EventRequestDTO, TraceStatusResponseDTO
+  entity/           TraceEntity, EventEntity, TraceStatus (enum)
+  repository/       TraceRepository, EventRepository
+  service/          WatchdogService
+  exception/        GlobalExceptionHandler, DuplicateEventException, TraceNotFoundException
+```
+
+---
+
+# API Reference
+
+Base URL: `http://localhost:8080/api`
+
+| Method | Path | Success | Errors |
+|--------|------|---------|--------|
+| `POST` | `/events` | `200 OK` | `400` Validation / `409` Duplicate |
+| `GET` | `/traces/{traceId}/status` | `200 OK` | `404` Not Found |
+
+### POST /events — Create a trace
+
+```bash
+curl -X POST http://localhost:8080/api/events \
+  -H "Content-Type: application/json" \
+  -d '{
+    "eventId": "evt-001",
+    "traceId": "trace-123",
+    "eventName": "APPLICATION_RECEIVED",
+    "result": "SUCCESS",
+    "occurredAt": "2026-07-19T10:00:00Z",
+    "nextExpectedEvent": "RULES_EVALUATED",
+    "nextEventTtlSeconds": 120,
+    "finalEvent": false,
+    "metadata": {"country": "MX", "entityId": "company-123"}
+  }'
+```
+
+Response: `200 OK` (empty body)
+
+### POST /events — Validation error
+
+```json
+{
+  "timestamp": "2026-07-20T01:21:29.069115Z",
+  "status": 400,
+  "error": "Validation failed",
+  "messages": ["eventName: must not be blank"]
+}
+```
+
+### POST /events — Duplicate event
+
+```json
+{
+  "timestamp": "2026-07-20T01:21:22.866341Z",
+  "status": 409,
+  "error": "Conflict",
+  "message": "Event already processed: evt-001"
+}
+```
+
+### GET /traces/{traceId}/status — Success
+
+```json
+{
+  "traceId": "trace-123",
+  "status": "WAITING_OTHER_EVENT",
+  "lastEventName": "APPLICATION_RECEIVED",
+  "lastEventResult": "SUCCESS",
+  "nextExpectedEvent": "RULES_EVALUATED",
+  "nextExpectedBefore": "2026-07-19T10:02:00Z",
+  "eventsReceived": 1
+}
+```
+
+### GET /traces/{traceId}/status — Not found
+
+```json
+{
+  "timestamp": "2026-07-20T01:21:22.938671Z",
+  "status": 404,
+  "error": "Not Found",
+  "message": "Trace not found: nonexistent"
+}
+```
+
+---
+
+# Design Decisions
+
+| # | Question | Decision | Rationale |
+|---|----------|----------|-----------|
+| 1 | Duplicate `eventId` | **409 Conflict** | Rejected before any trace mutation. Idempotent. |
+| 2 | Unexpected `eventName` | **Accepted** | No validation against expected event name. Out-of-order/late events are fine. |
+| 3 | Late event (after TTL) | **Accepted** | TTL only expires on status query. Subsequent events overwrite the expired status. |
+| 4 | TTL clock source | **`received_at`** (server) | Avoids clock-skew with client `occurredAt`. |
+| 5 | Completed trace + new events | **Accepted** | Trace not locked; new events can advance it. |
+| 6 | First event is final | **COMPLETED** immediately | No intermediate state. |
+| 7 | `result = ERROR` + nextEvent | **Same rules apply** | `result` is event-level, trace advances independently. |
+| 8 | Metadata format | **JSONB** in PostgreSQL | Flexible schema with queryability. |
+| 9 | Race conditions | **`@Transactional`** | All DB ops in one boundary. |
+| 10 | Unknown `traceId` | **404 Not Found** | Standard HTTP semantics. |
+
+---
+
+# Testing
+
+## Unit Tests
+
+**30 tests, 100% passing.** All run without a database.
+
+| Test Class | Count | Scope |
+|---|---|---|
+| `WatchdogServiceTest` | 9 | Duplicate rejection, trace creation (STARTED/WAITING/COMPLETED), multi-event updates, status lookup, TTL expiration |
+| `EventControllerTest` | 4 | POST /events: 200 OK, exception propagation, null optional fields |
+| `TraceControllerTest` | 3 | GET /traces/{id}/status: 200, 404, COMPLETED responses |
+| `GlobalExceptionHandlerTest` | 4 | 400, 404, 409, 500 mapping and message masking |
+| `EventRequestDTOTest` | 5 | @NotBlank, @NotNull, @Positive validation rules |
+| `DuplicateEventExceptionTest` | 2 | Message format, RuntimeException type |
+| `TraceNotFoundExceptionTest` | 2 | Message format, RuntimeException type |
+| `ClaropsChallengeApplicationTests` | 1 | Application context loads |
+
+```bash
+./mvnw clean test
+```
+
+## Hurl E2E Tests
+
+[Hurl](https://hurl.dev) is required. Install via `brew install hurl` (macOS) or from
+[hurl.dev](https://hurl.dev).
+
+```bash
+./mvnw spring-boot:run          # start the app
+hurl --test hurl/*.hurl          # run all E2E scenarios
+```
+
+| File | Scenario | Req | Assertions |
+|---|---|---|---|
+| `01-started-flow.hurl` | `STARTED` | 2 | `status == STARTED`, `eventsReceived == 1` |
+| `02-waiting-other-event-flow.hurl` | `WAITING_OTHER_EVENT` | 2 | `nextExpectedBefore` exists, `nextExpectedEvent` matches |
+| `03-completed-flow.hurl` | `COMPLETED` | 3 | `status == COMPLETED`, `eventsReceived == 2` |
+| `04-ttl-expired-flow.hurl` | `TTL_EXPIRED_FOR_EVENT` | 2 | 1s TTL + 2s delay → `status == TTL_EXPIRED_FOR_EVENT` |
+
+**Result:** `4/4 succeeded (100%)`, 9 requests, ~2.1s.
+
+---
+
+# Implementation Notes
+
+| Area | Role |
+|------|------|
+| **DDL** | Pre-existing. `01-init-schema.sql` required no changes. |
+| **Controllers & DTOs** | Standard Spring MVC with Jakarta `@Valid` validation. |
+| **WatchdogService** | Core state machine. Human corrections: proactive `existsById()` over catching `DataIntegrityViolationException`, `Persistable.isNew()` to prevent silent event overwrites. |
+| **JSONB metadata** | Three iterations: `@JdbcTypeCode` → failed (no FormatMapper), `AttributeConverter` → failed (VARCHAR/JSONB mismatch), `@ColumnTransformer(write = "?::jsonb")` + manual Jackson serialization → working. |
+| **Jackson** | Jackson 3.x (`tools.jackson.*`), not the older `com.fasterxml.jackson.*` namespace. |
+| **Refactoring** | Old `com.clara.challenge.event` package replaced with `controller`/`dto`/`entity`/`repository`/`service`/`exception`. |
+| **GlobalExceptionHandler** | `@RestControllerAdvice` mapping: 400 (validation, malformed body, bad arguments), 404 (missing trace), 409 (duplicate event), 500 (masked message + logged stack trace). |
+
+---
+
+# Database Architecture & ER Diagram
+Note: The source files for the ER diagram are available under the docs/db/ directory:
+ - docs/db/erDiagram.mmd — Mermaid source definition.
+ - docs/db/db_er.svg — High-resolution vector diagram export.
+
+```mermaid
+erDiagram
+    TRACES ||--o{ EVENTS : "contains"
+
+    TRACES {
+        VARCHAR trace_id PK "Unique identifier of the distributed flow"
+        VARCHAR status "STARTED | WAITING_OTHER_EVENT | TTL_EXPIRED_FOR_EVENT | COMPLETED"
+        VARCHAR last_event_name "Name of the last processed event"
+        VARCHAR last_event_result "SUCCESS | ERROR"
+        VARCHAR next_expected_event "Name of the next expected event (optional)"
+        TIMESTAMPTZ next_expected_before "Absolute expiration timestamp calculated via TTL"
+        INTEGER events_count "Total count of events received for this trace"
+        TIMESTAMPTZ created_at "Creation timestamp of the trace"
+        TIMESTAMPTZ updated_at "Last modification timestamp"
+    }
+
+    EVENTS {
+        VARCHAR event_id PK "Unique immutable event identifier"
+        VARCHAR trace_id FK "Reference to parent trace"
+        VARCHAR event_name "Name of the received event"
+        VARCHAR result "Event outcome: SUCCESS | ERROR"
+        TIMESTAMPTZ occurred_at "Timestamp provided by the origin system"
+        TIMESTAMPTZ received_at "Timestamp when received by our server"
+        VARCHAR next_expected_event "Next expected event name from this payload (optional)"
+        INTEGER next_event_ttl_seconds "TTL in seconds from this payload (optional)"
+        BOOLEAN final_event "Flag indicating if this event completes the flow"
+        JSONB metadata "Flexible JSON metadata payload"
+    }
+```
