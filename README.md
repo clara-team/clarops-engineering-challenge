@@ -137,11 +137,24 @@ So we will:
 7. If a step failed (**ERROR**) but still promises a next event, do we keep waiting?
 11. What if they promise a next event but they do not say for how long? (we found this one later)
 
-**[What could be going on?]**
+**[What could be going on?]** Flows are not all the same shape.
 
-**[Approach for this MVP]**
+- Some flows have twenty steps. Some have one. And a flow with one step is still a flow.
+- A step can fail and the flow can still continue. They retry, or somebody fixes it by hand.
+- An event promise that is not correctly filled, is not a typo. A template fills these fields, so probably if 1 event is wrong all of them are, until somebody notices.
+
+**[Approach for this MVP]** We only read the structural flags. That is `finalEvent`, and the pair `nextExpectedEvent` + `nextEventTtlSeconds`. Nothing else decides the status.
+
+- If the very first event says `finalEvent`, the flow is COMPLETED. We do not need a second one.
+- `result` decides nothing. It talks about the step. The status talks about the flow. So an ERROR that promises a next event keeps waiting, and a flow can be COMPLETED with `result` ERROR. Two different things.
+- A promise that is not correctly filled is not a promise. Without `nextEventTtlSeconds` there is no deadline, and without a deadline there is nothing to expire. So the trace status will be STARTED, not WAITING. We are not going to say we are waiting for something that can never expire, and we are not going to call it COMPLETED either, because nobody told us it was the last one. If another event arrives with an actual promise, the flow starts waiting again. Rejecting it would mean rejecting that whole team.
+
+We did not decide anything new here. We only read the flags they send us, which is what we agreed in that meeting, and these three questions answer themselves.
 
 **[The trade-off]**
+
+- A step fails (result=ERROR) and the team gives up. But that event promised another one, so we keep saying WAITING until the TTL runs out. And we cannot do better, because an ERROR looks the same whether they are retrying or they gave up. We still find out, but only when the TTL expires.
+- A promise that is not correclty filled just disappears. They meant to promise something, but we do not know how to wait for it, so we do not wait at all. And we never find out.
 
 ### D. The loose ones
 
