@@ -35,17 +35,17 @@ The list below is the second half of the work. This is the first half, and I am 
 
 ## 1. Schema
 
-- [ ] **1.1** Write the `events` table. One row per event received. `event_id` as primary key, which is what makes deduplication a constraint and not application logic. Put it in `docker/init-scripts/db/01-init-schema.sql`.
-- [ ] **1.2** Write the `trace_state` table. One row per `trace_id`. It will hold the facts of the last event that moved the flow, plus `next_expected_before` already calculated. Put it in `docker/init-scripts/db/01-init-schema.sql`.
-- [ ] **1.3** Add `received_at` to `events`, separate from `occurred_at`. We will not be using it to calculate the status, only to see the gap between their clock and ours.
-- [ ] **1.4** Put both tables in `docker/init-scripts/db/01-init-schema.sql`, next to the existing `health` table. Remember the script only runs on a fresh volume.
+- [x] **1.1** Write the `events` table. One row per event received. `event_id` as primary key, which is what makes deduplication a constraint and not application logic. Put it in `docker/init-scripts/db/01-init-schema.sql`.
+- [x] **1.2** Write the `trace_state` table. One row per `trace_id`. It will hold the facts of the last event that moved the flow, plus `next_expected_before` already calculated. Put it in `docker/init-scripts/db/01-init-schema.sql`.
+- [x] **1.3** Add `received_at` to `events`, separate from `occurred_at`. We will not be using it to calculate the status, only to see the gap between their clock and ours.
+- [x] **1.4** Put both tables in `docker/init-scripts/db/01-init-schema.sql`, next to the existing `health` table. Remember the script only runs on a fresh volume.
 
 ## 2. Receiving an event, happy path; breaking the ice
 
 - [ ] **2.1** Request DTO with the nine fields, validating the five required ones and that `result` is `SUCCESS` or `ERROR`.
-- [ ] **2.2** `POST /api/events` that inserts the event row and returns 201.
+- [x] **2.2** `POST /api/events` that inserts the event row and returns 201.
 - [ ] **2.3** In the same transaction, upsert `trace_state`. Both writes or neither.
-- [ ] **2.4** Calculate `next_expected_before` as `occurred_at + next_event_ttl_seconds` when both fields are present, and store it. This is the only place that math happens.
+- [x] **2.4** Calculate `next_expected_before` as `occurred_at + next_event_ttl_seconds` when both fields are present, and store it. This is the only place that math happens.
 
 ## 3. Calculating the status
 
@@ -53,8 +53,8 @@ This is the core, and it is a pure class. No Spring, no database, an injected `C
 
 - [ ] **3.1** A domain class that takes the trace snapshot plus a `Clock` and returns one of the four statuses.
 - [ ] **3.2** Compare in this order: COMPLETED, then TTL, then WAITING, then STARTED. Checking TTL first would report a closed flow as expired. `[T5]`
-- [ ] **3.3** Promise alive and the clock is before the deadline. `[T1]`
-- [ ] **3.4** Same snapshot, clock moved past the deadline. Nothing was written and the answer changed. `[T2]`
+- [x] **3.3** Promise alive and the clock is before the deadline. `[T1]`
+- [ ] **3.4** Same snapshot, clock moved past the deadline. Nothing was written and the answer changed. `[T2]` **← NEXT (3)** the logic is already written and the infrastructure is up, so this one is almost free. It is the test that proves the whole idea.
 - [ ] **3.5** Exactly at the deadline the trace is still waiting. Expired only after. `[T3]`
 - [ ] **3.6** First event carries `finalEvent`. `[T4]`
 - [ ] **3.7** `result` never decides the status. `[T6]` `[T7]`
@@ -63,15 +63,15 @@ This is the core, and it is a pure class. No Spring, no database, an injected `C
 
 ## 4. Reading the status
 
-- [ ] **4.1** `GET /api/traces/{traceId}/status` reading one row and calling the class from task 3.
-- [ ] **4.2** Response DTO with the seven fields documented in the README.
-- [ ] **4.3** 404 with a body naming the `traceId` that was asked for. `[H5]`
+- [x] **4.1** `GET /api/traces/{traceId}/status` reading one row and calling the class from task 3.
+- [x] **4.2** Response DTO with the seven fields documented in the README.
+- [ ] **4.3** 404 with a body naming the `traceId` that was asked for. `[H5]` **← NEXT (1)** the endpoint answers 404 already, but with an empty body, which contradicts section 2 question 10.
 
 ## 5. The events that do not behave
 
 Each one is a branch in the ingest path, in this order.
 
-- [ ] **5.1** An `eventId` we already have. 200, nothing stored, snapshot untouched. `[I1]`
+- [ ] **5.1** An `eventId` we already have. 200, nothing stored, snapshot untouched. `[I1]` **← NEXT (2)** today a repeated `eventId` does a silent update, which is the opposite of what we decided.
 - [ ] **5.2** The trace is already COMPLETED. Stored, snapshot untouched. `[I2]`
 - [ ] **5.3** The event is older than the last one stored. Stored, snapshot untouched. `[I3]`
 - [ ] **5.4** An `eventName` we were not expecting. 409, stored, snapshot untouched. `[I4]`
@@ -91,5 +91,5 @@ Each one is a branch in the ingest path, in this order.
 - [ ] **7.1** How to run the project, including the Java 21 requirement and the `/api` prefix.
 - [ ] **7.2** How to run the Hurl tests.
 - [ ] **7.3** Assumptions.
-- [ ] **7.4** `AI_USAGE.md`.
+- [x] **7.4** `AI_USAGE.md`.
 - [ ] **7.5** A pass for typos over the whole README.
